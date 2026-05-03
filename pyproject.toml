@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "itjujiryou"
+version = "0.1.0"
+description = "IT十字陵 — 仮想下請け事務所システム (Phase 1 MVP)"
+requires-python = ">=3.11"
+dependencies = [
+    "claude-agent-sdk>=0.1.0",
+    "aiosqlite>=0.20.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+itjujiryou = "src.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
