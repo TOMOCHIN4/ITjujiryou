@@ -11,3 +11,5 @@ deliverables/
 build/
 dist/
 .DS_Store
+scripts/gen-asset/venv/
+.build/
