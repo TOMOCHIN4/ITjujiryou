@@ -1,10 +1,11 @@
 """エージェント基底: prompt 読み込み、ツール権限テーブル、ClaudeAgentOptions ビルダ。
 
-各エージェントの allowed_tools はここで一元管理する。サウザー化（社長が実務ツール
-を持つこと）を防ぐコード上の砦。
+各エージェントの allowed_tools / model / effort はここで一元管理する。
+サウザー化（社長が実務ツールを持つこと）を防ぐコード上の砦。
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -13,6 +14,35 @@ PROMPTS_DIR = REPO_ROOT / "prompts"
 
 # MCP サーバ名と各カスタムツールの完全修飾名
 MCP_SERVER_NAME = "itjujiryou"
+
+# モデル: 5人とも Opus 4.7。env で個別上書き可
+# 例: ITJUJIRYOU_MODEL_SOUTHER=claude-sonnet-4-6
+DEFAULT_MODEL = "claude-opus-4-7"
+AGENT_MODEL: dict[str, str] = {
+    "souther": DEFAULT_MODEL,
+    "yuko":    DEFAULT_MODEL,
+    "designer": DEFAULT_MODEL,
+    "engineer": DEFAULT_MODEL,
+    "writer":   DEFAULT_MODEL,
+}
+
+# Thinking effort: ユウコ high、他 medium。env で個別上書き可
+# 例: ITJUJIRYOU_EFFORT_SOUTHER=high
+AGENT_EFFORT: dict[str, str] = {
+    "souther":  "medium",
+    "yuko":     "high",
+    "designer": "medium",
+    "engineer": "medium",
+    "writer":   "medium",
+}
+
+
+def _resolve_model(agent: str) -> str:
+    return os.environ.get(f"ITJUJIRYOU_MODEL_{agent.upper()}", AGENT_MODEL[agent])
+
+
+def _resolve_effort(agent: str) -> str:
+    return os.environ.get(f"ITJUJIRYOU_EFFORT_{agent.upper()}", AGENT_EFFORT[agent])
 
 
 def mcp_tool(name: str) -> str:
@@ -105,6 +135,8 @@ def build_agent_options(agent: str, mcp_server) -> "object":
         allowed_tools=AGENT_TOOLS[agent],
         mcp_servers={MCP_SERVER_NAME: mcp_server},
         permission_mode="bypassPermissions",
+        model=_resolve_model(agent),
+        effort=_resolve_effort(agent),
     )
 
 
