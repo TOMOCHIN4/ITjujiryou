@@ -184,8 +184,13 @@ async def dispatch_task_tool(args: dict[str, Any]) -> dict:
             f"これ以上の revise は禁止。社長へ escalate_to_president を上申してください。"
         )
 
-    sub_id = explicit_subtask_id or await store.create_subtask(
-        task_id, assigned_to, ticket.get("objective", "")[:500]
+    # explicit_subtask_id が渡された場合も必ず subtasks 行を確保する
+    # (INSERT OR IGNORE により revision 経路でも安全に同じ行を共有)
+    sub_id = await store.create_subtask(
+        task_id,
+        assigned_to,
+        ticket.get("objective", "")[:500],
+        sub_id=explicit_subtask_id,
     )
     await log(
         "yuko",

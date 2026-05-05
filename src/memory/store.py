@@ -90,13 +90,19 @@ class Store:
 
     # --- subtasks ---
     async def create_subtask(
-        self, parent_task_id: str, assigned_to: str, description: str
+        self,
+        parent_task_id: str,
+        assigned_to: str,
+        description: str,
+        sub_id: Optional[str] = None,
     ) -> str:
-        sub_id = _new_id()
+        """sub_id を渡すと既存行があれば再利用 (revision サイクル)、無ければ
+        その id で作成する。渡さなければ UUID を発番。"""
+        sub_id = sub_id or _new_id()
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
-                "INSERT INTO subtasks (id, parent_task_id, assigned_to, description, status, "
-                "created_at) VALUES (?,?,?,?,?,?)",
+                "INSERT OR IGNORE INTO subtasks (id, parent_task_id, assigned_to, "
+                "description, status, created_at) VALUES (?,?,?,?,?,?)",
                 (sub_id, parent_task_id, assigned_to, description, "in_progress", _now()),
             )
             await db.commit()

@@ -42,6 +42,25 @@ async def test_messages_and_subtasks(store):
     assert subs[0]["deliverable_path"] == "/path/to/out"
 
 
+async def test_create_subtask_with_explicit_id_persists(store):
+    """ユウコがラベル付き subtask_id を渡しても行が永続化されること。"""
+    tid = await store.create_task("t", "d", "r")
+    sid = await store.create_subtask(tid, "writer", "exec", sub_id="writing-001")
+    assert sid == "writing-001"
+    subs = await store.list_subtasks(tid)
+    assert len(subs) == 1 and subs[0]["id"] == "writing-001"
+
+
+async def test_create_subtask_explicit_id_idempotent(store):
+    """同じ explicit id で再呼出ししても重複行が増えず、既存行を返すこと (revision)。"""
+    tid = await store.create_task("t", "d", "r")
+    sid1 = await store.create_subtask(tid, "writer", "exec", sub_id="writing-001")
+    sid2 = await store.create_subtask(tid, "writer", "exec (revised)", sub_id="writing-001")
+    assert sid1 == sid2
+    subs = await store.list_subtasks(tid)
+    assert len(subs) == 1
+
+
 async def test_list_tasks_filter(store):
     a = await store.create_task("a", "d", "r")
     b = await store.create_task("b", "d", "r")
