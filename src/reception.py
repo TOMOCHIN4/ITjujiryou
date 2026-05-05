@@ -29,27 +29,39 @@ def find_forbidden_terms(text: str) -> list[str]:
     return [t for t in FORBIDDEN_TERMS if t in text]
 
 
+import re
+
+_GREETING_RE = re.compile(
+    r"(お客様|ご依頼主様|拝啓|お世話になって|[〇○]{1,2}様)"
+)
+
+
 def _strip_internal_preamble(text: str) -> str:
     """ユウコ応答先頭の内部独白を剥がす。
 
-    `---` のみからなる行が先頭付近にあり、その上のブロックが内部判断っぽい
-    キーワードを含む場合のみ、その区切り以降を採用する。
-    クライアント宛の通常文面（先頭から `お客様` で始まる等）は無傷で返す。
+    パターンA: 先頭付近に `---` 単独行があり、その上が内部判断キーワードを
+                含む → 区切り以降を採用
+    パターンB: `---` なしでも、先頭にクライアント宛挨拶 (お客様/○○様/拝啓 等)
+                以外の短い前置きがあり、内部判断キーワードを含む場合 → 挨拶
+                語の位置から採用
+    クライアント宛の通常文面 (先頭から お客様 で始まる等) は無傷。
     """
+    # パターンA: --- 区切り
     lines = text.splitlines()
-    # 先頭から最初の "---" 単独行を探す（先頭 30 行以内に限定）
-    sep_idx = -1
     for i, line in enumerate(lines[:30]):
         if line.strip() == "---":
-            sep_idx = i
-            break
-    if sep_idx <= 0:
-        return text
-    preamble = "\n".join(lines[:sep_idx])
-    if not any(kw in preamble for kw in _INTERNAL_KEYWORDS):
-        return text  # 内部独白っぽくない `---` は触らない
-    body = "\n".join(lines[sep_idx + 1:]).lstrip("\n")
-    return body or text
+            preamble = "\n".join(lines[:i])
+            if any(kw in preamble for kw in _INTERNAL_KEYWORDS):
+                return "\n".join(lines[i + 1:]).lstrip("\n") or text
+            break  # 装飾的 --- は触らない
+    # パターンB: --- 無し、先頭が挨拶語でなく内部キーワードを含む場合
+    head = text[:500]
+    m = _GREETING_RE.search(head)
+    if m and m.start() > 0:
+        preamble = text[: m.start()]
+        if any(kw in preamble for kw in _INTERNAL_KEYWORDS):
+            return text[m.start():].lstrip()
+    return text
 
 
 async def handle_client_message(text: str, task_id: str | None = None) -> str:

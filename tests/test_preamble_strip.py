@@ -46,3 +46,21 @@ def test_keep_response_with_decorative_dash_inside_letter():
 def test_hiragana_persona_terms_caught():
     text = "本件は社長の「ひかぬ」精神に従いお断りいたします。"
     assert "ひかぬ" in find_forbidden_terms(text)
+
+
+def test_strip_preamble_without_separator():
+    """`---` 無しで内部独白 + 改行 + 挨拶が連続するケース。"""
+    raw = (
+        "成果物の品質は計画通り。承認して納品へ進めます。\n"
+        "お客様\n\n"
+        "お世話になっております。"
+    )
+    out = _strip_internal_preamble(raw)
+    assert out.startswith("お客様")
+    assert "承認して納品へ進めます" not in out
+
+
+def test_keep_legitimate_prefix_with_keyword_word():
+    """挨拶が先頭にあり内部キーワードを含まない場合は触らない。"""
+    raw = "お客様\n\n下記の通り判断いたしました。"  # 「判断」が本文に出ても先頭が挨拶
+    assert _strip_internal_preamble(raw) == raw
