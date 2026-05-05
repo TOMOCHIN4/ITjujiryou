@@ -7,14 +7,14 @@
 
 ## 認証について
 
-本システムは **Claude Code の OAuth ログイン (Pro/Max サブスク)** を利用します。
-事前に以下を済ませておいてください:
+本システムは **Claude Max プランの OAuth ログイン** を利用します。
+事前に以下を済ませて Anthropic アカウント (Max プラン) にログインしておいてください:
 
 ```bash
 claude login
 ```
 
-`ANTHROPIC_API_KEY` は **設定不要**（API キー認証を使う場合のみ設定してください）。
+`ANTHROPIC_API_KEY` は **使用しません**（.env に設定する必要はありません）。
 
 ## セットアップ
 

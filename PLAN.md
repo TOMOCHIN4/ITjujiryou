@@ -13,7 +13,7 @@
 
 - **言語**: Python 3.11+
 - **主要ライブラリ**: `claude-agent-sdk`, `fastapi`, `uvicorn`, `aiosqlite`, `websockets`
-- **認証**: `ANTHROPIC_API_KEY` 環境変数（API キー認証、Pro/Max サブスクではない）
+- **認証**: Claude Max プランの OAuth ログイン（`claude login` 済みの状態を利用する）。API キーは使用しない。
 - **OS**: クロスプラットフォーム想定（macOS / Linux / Windows）
 
 ### 0.2 利用形態
@@ -1250,9 +1250,10 @@ python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e .
 
-# 環境変数
-cp .env.example .env
-# .env を編集して ANTHROPIC_API_KEY を設定
+# 認証（Claude Max プランの OAuth）
+claude login
+# ブラウザで Anthropic アカウント（Max プラン）にログインする。
+# API キーは不要。.env に ANTHROPIC_API_KEY を書く必要はない。
 
 # データベース初期化
 python -m src.main init
