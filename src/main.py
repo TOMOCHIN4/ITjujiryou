@@ -9,6 +9,11 @@ from __future__ import annotations
 import asyncio
 import sys
 
+for _stream in (sys.stdout, sys.stderr):
+    reconfigure = getattr(_stream, "reconfigure", None)
+    if reconfigure is not None:
+        reconfigure(encoding="utf-8", errors="replace")
+
 from src.memory.store import get_store
 
 
