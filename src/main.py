@@ -1,8 +1,9 @@
 """IT十字陵 CLI エントリポイント。
 
 使い方:
-    python -m src.main init        # DB 初期化
-    python -m src.main cli         # 対話モードで発注
+    python -m src.main init                          # DB 初期化
+    python -m src.main cli                           # 対話モードで発注
+    python -m src.main serve [--host H] [--port P]   # Web ダッシュボード起動
 """
 from __future__ import annotations
 
@@ -67,6 +68,34 @@ async def cmd_cli() -> None:
         print(f"[ユウコ]\n{response}\n")
 
 
+async def cmd_serve(host: str = "127.0.0.1", port: int = 8000) -> None:
+    await get_store().init()
+    import uvicorn
+    from src.ui.api import app
+
+    config = uvicorn.Config(app, host=host, port=port, log_level="info")
+    server = uvicorn.Server(config)
+    print(f"IT十字陵 ダッシュボード起動: http://{host}:{port}")
+    await server.serve()
+
+
+def _parse_serve_args(argv: list[str]) -> tuple[str, int]:
+    host = "127.0.0.1"
+    port = 8000
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--host" and i + 1 < len(argv):
+            host = argv[i + 1]
+            i += 2
+        elif a == "--port" and i + 1 < len(argv):
+            port = int(argv[i + 1])
+            i += 2
+        else:
+            i += 1
+    return host, port
+
+
 def main() -> None:
     if len(sys.argv) < 2:
         print(__doc__)
@@ -76,6 +105,9 @@ def main() -> None:
         asyncio.run(cmd_init())
     elif cmd == "cli":
         asyncio.run(cmd_cli())
+    elif cmd == "serve":
+        host, port = _parse_serve_args(sys.argv[2:])
+        asyncio.run(cmd_serve(host, port))
     else:
         print(f"不明なコマンド: {cmd}")
         print(__doc__)

@@ -53,3 +53,16 @@ async def log(
     if details:
         payload.update(details)
     await get_store().log_event(agent, event_type, task_id, payload)
+    # WS ブローカへの publish (UI 未起動でも CLI を壊さない)
+    try:
+        from src.ui.broker import broker
+        broker.publish({
+            "type": "event",
+            "timestamp": datetime.now().isoformat(),
+            "agent": agent,
+            "event_type": event_type,
+            "task_id": task_id,
+            "details": payload,
+        })
+    except Exception:
+        pass

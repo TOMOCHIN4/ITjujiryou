@@ -8,9 +8,12 @@ version = "0.1.0"
 description = "IT十字陵 — 仮想下請け事務所システム (Phase 1 MVP)"
 requires-python = ">=3.11"
 dependencies = [
-    "claude-agent-sdk>=0.1.0",
+    # claude-agent-sdk は常に最新を取りに行く方針（下限のみ指定し、上限は固定しない）
+    "claude-agent-sdk>=0.1.73",
     "aiosqlite>=0.20.0",
     "python-dotenv>=1.0.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
 ]
 
 [project.optional-dependencies]

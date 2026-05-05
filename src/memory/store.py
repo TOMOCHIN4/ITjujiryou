@@ -250,6 +250,40 @@ class Store:
             return n
 
     # --- events ---
+    async def list_events(
+        self,
+        task_id: Optional[str] = None,
+        limit: int = 200,
+        since_id: Optional[int] = None,
+    ) -> list[dict[str, Any]]:
+        clauses: list[str] = []
+        params: list[Any] = []
+        if task_id is not None:
+            clauses.append("task_id = ?")
+            params.append(task_id)
+        if since_id is not None:
+            clauses.append("id > ?")
+            params.append(since_id)
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        params.append(int(limit))
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                f"SELECT id, timestamp, agent, event_type, task_id, details "
+                f"FROM events {where} ORDER BY id DESC LIMIT ?",
+                params,
+            )
+            rows = await cur.fetchall()
+        out: list[dict[str, Any]] = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["details"] = json.loads(d["details"]) if d["details"] else {}
+            except json.JSONDecodeError:
+                d["details"] = {"raw": d["details"]}
+            out.append(d)
+        return out
+
     async def log_event(
         self,
         agent: str,

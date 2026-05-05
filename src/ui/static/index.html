@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IT十字陵 ダッシュボード</title>
+<link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">IT十字陵 <span class="sub">案件管理ダッシュボード</span></div>
+    <div class="conn">
+      <span id="ws-dot" class="dot offline"></span>
+      <span id="ws-label">接続待機</span>
+    </div>
+  </header>
+
+  <section class="staff-bar" id="staff-bar"></section>
+
+  <section class="kanban" id="kanban"></section>
+
+  <section class="timeline-wrap">
+    <h2>タイムライン</h2>
+    <div class="timeline" id="timeline"></div>
+  </section>
+
+  <section class="order-form">
+    <textarea id="order-text" rows="3" placeholder="発注内容を入力（例: AIエージェントについて200字程度のミニ紹介文）"></textarea>
+    <div class="row">
+      <button id="order-submit">送信</button>
+      <span id="order-status" class="hint"></span>
+    </div>
+  </section>
+
+  <dialog id="task-dialog">
+    <article id="task-detail"></article>
+    <form method="dialog"><button>閉じる</button></form>
+  </dialog>
+
+  <script type="module" src="/static/main.js"></script>
+</body>
+</html>

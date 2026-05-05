@@ -30,6 +30,8 @@ python -m src.main init
 
 ## 使い方
 
+### CLI モード
+
 ```bash
 python -m src.main cli
 ```
@@ -39,6 +41,18 @@ python -m src.main cli
 クライアント向け応答が表示されます。
 
 `exit` で終了。
+
+### Web ダッシュボード (Phase 2)
+
+```bash
+python -m src.main serve              # http://127.0.0.1:8000
+python -m src.main serve --port 8080  # ポート変更
+```
+
+ブラウザで開くと、5名のステータスカード／案件カンバン／タイムラインが
+表示され、フォームから発注すると CLI と同じフローがリアルタイム可視化されます。
+WebSocket で更新されるため、リロード不要。納品物は案件カードをクリックして
+プレビュー / ダウンロードできます。
 
 ## テスト
 
