@@ -17,6 +17,29 @@
 
   <section class="staff-bar" id="staff-bar"></section>
 
+  <section class="search-bar">
+    <input type="text" id="f-q" placeholder="タイトル・本文で検索" />
+    <select id="f-status">
+      <option value="">全ステータス</option>
+      <option value="received">受付</option>
+      <option value="hearing">ヒアリング</option>
+      <option value="approved">承認済</option>
+      <option value="in_progress">作業中</option>
+      <option value="review">レビュー</option>
+      <option value="delivered">納品済</option>
+    </select>
+    <select id="f-assigned">
+      <option value="">全担当</option>
+      <option value="designer">デザイナー</option>
+      <option value="engineer">エンジニア</option>
+      <option value="writer">ライター</option>
+      <option value="multiple">複数</option>
+    </select>
+    <input type="date" id="f-since" title="この日付以降" />
+    <input type="date" id="f-until" title="この日付以前" />
+    <button id="f-clear" type="button">クリア</button>
+  </section>
+
   <section class="kanban" id="kanban"></section>
 
   <section class="timeline-wrap">

@@ -31,8 +31,20 @@ async def index() -> FileResponse:
 
 
 @app.get("/api/tasks")
-async def api_list_tasks(status: Optional[str] = None) -> list[dict[str, Any]]:
-    return await get_store().list_tasks(status=status)
+async def api_list_tasks(
+    status: Optional[str] = None,
+    assigned_to: Optional[str] = None,
+    q: Optional[str] = None,
+    since: Optional[str] = None,
+    until: Optional[str] = None,
+) -> list[dict[str, Any]]:
+    return await get_store().list_tasks(
+        status=status,
+        assigned_to=assigned_to,
+        q=q,
+        since=since,
+        until=until,
+    )
 
 
 @app.get("/api/tasks/{task_id}")

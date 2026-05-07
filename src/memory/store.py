@@ -76,15 +76,39 @@ class Store:
             row = await cur.fetchone()
             return dict(row) if row else None
 
-    async def list_tasks(self, status: Optional[str] = None) -> list[dict[str, Any]]:
+    async def list_tasks(
+        self,
+        status: Optional[str] = None,
+        assigned_to: Optional[str] = None,
+        q: Optional[str] = None,
+        since: Optional[str] = None,
+        until: Optional[str] = None,
+    ) -> list[dict[str, Any]]:
+        clauses: list[str] = []
+        params: list[Any] = []
+        if status:
+            clauses.append("status=?")
+            params.append(status)
+        if assigned_to:
+            clauses.append("assigned_to=?")
+            params.append(assigned_to)
+        if q:
+            clauses.append("(title LIKE ? OR description LIKE ?)")
+            like = f"%{q}%"
+            params.extend([like, like])
+        if since:
+            clauses.append("created_at>=?")
+            params.append(since)
+        if until:
+            clauses.append("created_at<=?")
+            params.append(until)
+        sql = "SELECT * FROM tasks"
+        if clauses:
+            sql += " WHERE " + " AND ".join(clauses)
+        sql += " ORDER BY created_at DESC"
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
-            if status:
-                cur = await db.execute(
-                    "SELECT * FROM tasks WHERE status=? ORDER BY created_at DESC", (status,)
-                )
-            else:
-                cur = await db.execute("SELECT * FROM tasks ORDER BY created_at DESC")
+            cur = await db.execute(sql, params)
             rows = await cur.fetchall()
             return [dict(r) for r in rows]
 

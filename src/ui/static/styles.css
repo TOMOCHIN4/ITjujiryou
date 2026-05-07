@@ -30,7 +30,7 @@ html, body {
 
 body {
   display: grid;
-  grid-template-rows: auto auto auto 1fr auto;
+  grid-template-rows: auto auto auto auto 1fr auto;
   height: 100vh;
   gap: 0;
 }
@@ -137,6 +137,45 @@ body {
 .tl-line.ag-engineer  { border-left-color: var(--engineer); } .tl-line.ag-engineer .ag { color: var(--engineer); }
 .tl-line.ag-writer    { border-left-color: var(--writer); }    .tl-line.ag-writer .ag { color: var(--writer); }
 .tl-line.ag-system    { border-left-color: var(--system); }    .tl-line.ag-system .ag { color: var(--system); }
+
+/* 社長の発言は地の色を一段濃く、左ボーダー太め */
+.tl-line.souther-line {
+  background: rgba(201, 169, 110, 0.08);
+  border-left-width: 5px;
+  font-weight: 500;
+}
+/* ユウコの裁定 (evaluate) のハイライト */
+.tl-line.verdict-approve  { background: rgba(74, 222, 128, 0.10); border-left-color: var(--good); }
+.tl-line.verdict-revise   { background: rgba(250, 204, 21, 0.10); border-left-color: var(--warn); }
+.tl-line.verdict-escalate { background: rgba(239, 68, 68, 0.12);  border-left-color: var(--bad); }
+
+/* 検索バー */
+.search-bar {
+  display: flex; gap: 8px; align-items: center;
+  padding: 8px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.search-bar input[type="text"] { flex: 1 1 220px; min-width: 200px; }
+.search-bar input, .search-bar select {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 12.5px;
+}
+.search-bar button {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.search-bar button:hover { border-color: var(--accent); }
 
 .order-form {
   background: var(--panel);

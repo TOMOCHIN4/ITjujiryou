@@ -33,6 +33,21 @@ def test_get_tasks_empty(client):
     assert isinstance(r.json(), list)
 
 
+def test_get_tasks_with_filters(client):
+    r = client.get(
+        "/api/tasks",
+        params={
+            "q": "AI",
+            "status": "delivered",
+            "assigned_to": "writer",
+            "since": "2026-01-01T00:00:00+00:00",
+            "until": "2026-12-31T23:59:59+00:00",
+        },
+    )
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
 def test_get_events_empty(client):
     r = client.get("/api/events?limit=10")
     assert r.status_code == 200

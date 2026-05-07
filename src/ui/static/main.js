@@ -38,15 +38,31 @@ function trimText(s, n = 220) {
 // ---------- Timeline ----------
 const timelineEl = () => $("#timeline");
 
+const VERDICT_LABEL = {
+  approve: "✅ 承認",
+  revise: "↩ 差し戻し",
+  escalate_to_president: "👑 社長へ上申",
+};
+
 function appendEvent(ev) {
   const el = document.createElement("div");
   const agent = ev.agent || "system";
-  el.className = `tl-line ag-${agent}`;
+  const classes = ["tl-line", `ag-${agent}`];
+  if (agent === "souther") classes.push("souther-line");
+  const details = ev.details || {};
+  if (ev.event_type === "evaluate" && details.decision) {
+    const key = details.decision === "escalate_to_president" ? "escalate" : details.decision;
+    classes.push(`verdict-${key}`);
+  }
+  el.className = classes.join(" ");
   const ts = document.createElement("span"); ts.className = "ts"; ts.textContent = `[${fmtTime(ev.timestamp)}]`;
   const ag = document.createElement("span"); ag.className = "ag"; ag.textContent = `${(STAFF_META[agent]?.icon || "•")} ${agent}`;
   const msg = document.createElement("span");
-  const details = ev.details || {};
-  const m = details.message || details.raw || ev.event_type || "";
+  let m = details.message || details.raw || ev.event_type || "";
+  if (ev.event_type === "evaluate" && details.decision) {
+    const tag = VERDICT_LABEL[details.decision] || details.decision;
+    m = `${tag} ${typeof m === "string" ? m : ""}`.trim();
+  }
   msg.textContent = trimText(typeof m === "string" ? m : JSON.stringify(m));
   el.appendChild(ts); el.appendChild(ag); el.appendChild(msg);
   const tl = timelineEl();
@@ -169,17 +185,58 @@ function connectWS() {
 }
 
 // ---------- Initial fetch ----------
+function currentFilters() {
+  const q = $("#f-q")?.value.trim() || "";
+  const status = $("#f-status")?.value || "";
+  const assigned_to = $("#f-assigned")?.value || "";
+  const since = $("#f-since")?.value || "";
+  const until = $("#f-until")?.value || "";
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (status) params.set("status", status);
+  if (assigned_to) params.set("assigned_to", assigned_to);
+  if (since) params.set("since", since);
+  // until は終日まで含めるため 23:59:59 を付ける
+  if (until) params.set("until", `${until}T23:59:59`);
+  return params;
+}
+
 async function refreshTasks() {
-  const r = await fetch("/api/tasks");
+  const params = currentFilters();
+  const url = "/api/tasks" + (params.toString() ? `?${params}` : "");
+  const r = await fetch(url);
   if (r.ok) renderKanban(await r.json());
+}
+
+function debounce(fn, ms) {
+  let t;
+  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
 }
 async function refreshStaff() {
   const r = await fetch("/api/staff");
   if (r.ok) renderStaff(await r.json());
 }
 
+function bindFilterHandlers() {
+  const onChange = debounce(refreshTasks, 300);
+  ["f-q", "f-status", "f-assigned", "f-since", "f-until"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("input", onChange);
+    el.addEventListener("change", onChange);
+  });
+  const clear = $("#f-clear");
+  if (clear) clear.addEventListener("click", () => {
+    ["f-q", "f-status", "f-assigned", "f-since", "f-until"].forEach((id) => {
+      const el = document.getElementById(id); if (el) el.value = "";
+    });
+    refreshTasks();
+  });
+}
+
 async function init() {
   renderStaff(["souther","yuko","designer","engineer","writer"].map(a => ({agent: a, state: "idle"})));
+  bindFilterHandlers();
   await refreshTasks();
   await refreshStaff();
   connectWS();

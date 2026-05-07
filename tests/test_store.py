@@ -69,3 +69,52 @@ async def test_list_tasks_filter(store):
     approved = await store.list_tasks(status="approved")
     assert any(t["id"] == a for t in received)
     assert any(t["id"] == b for t in approved)
+
+
+async def test_list_tasks_q_text_search(store):
+    await store.create_task("AIエージェント紹介記事", "AI を扱う記事", "r")
+    await store.create_task("ロゴ案", "シンプルなロゴ案を作る", "r")
+
+    titles = [t["title"] for t in await store.list_tasks(q="AI")]
+    assert "AIエージェント紹介記事" in titles and "ロゴ案" not in titles
+
+    # 本文 (description) でもヒットすること
+    titles = [t["title"] for t in await store.list_tasks(q="シンプル")]
+    assert "ロゴ案" in titles
+
+
+async def test_list_tasks_assigned_to_and_status_and(store):
+    import aiosqlite
+
+    a = await store.create_task("alpha", "d", "r")
+    b = await store.create_task("beta", "d", "r")
+    async with aiosqlite.connect(store.db_path) as db:
+        await db.execute("UPDATE tasks SET assigned_to=? WHERE id=?", ("writer", a))
+        await db.execute("UPDATE tasks SET assigned_to=? WHERE id=?", ("designer", b))
+        await db.commit()
+    await store.update_task_status(a, "approved")
+    await store.update_task_status(b, "approved")
+
+    rows = await store.list_tasks(status="approved", assigned_to="writer")
+    assert [t["id"] for t in rows] == [a]
+
+
+async def test_list_tasks_date_range(store):
+    import aiosqlite
+
+    a = await store.create_task("old", "d", "r")
+    b = await store.create_task("new", "d", "r")
+    async with aiosqlite.connect(store.db_path) as db:
+        await db.execute(
+            "UPDATE tasks SET created_at=? WHERE id=?", ("2025-01-01T00:00:00+00:00", a)
+        )
+        await db.execute(
+            "UPDATE tasks SET created_at=? WHERE id=?", ("2026-06-01T00:00:00+00:00", b)
+        )
+        await db.commit()
+
+    only_new = await store.list_tasks(since="2026-01-01T00:00:00+00:00")
+    assert [t["id"] for t in only_new] == [b]
+
+    only_old = await store.list_tasks(until="2025-12-31T23:59:59+00:00")
+    assert [t["id"] for t in only_old] == [a]
