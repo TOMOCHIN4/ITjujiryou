@@ -31,7 +31,7 @@ AGENT_MODEL: dict[str, str] = {
 # Thinking effort: ユウコ high、他 medium。env で個別上書き可
 # 例: ITJUJIRYOU_EFFORT_SOUTHER=high
 AGENT_EFFORT: dict[str, str] = {
-    "souther":  "medium",
+    "souther":  "high",
     "yuko":     "high",
     "designer": "medium",
     "engineer": "medium",
