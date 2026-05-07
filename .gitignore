@@ -14,3 +14,7 @@ dist/
 .DS_Store
 scripts/gen-asset/venv/
 .build/
+
+# 個人参照資料
+*.rtf
+
