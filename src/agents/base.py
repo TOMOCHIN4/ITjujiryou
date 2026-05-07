@@ -28,14 +28,15 @@ AGENT_MODEL: dict[str, str] = {
     "writer":   DEFAULT_MODEL,
 }
 
-# Thinking effort: ユウコ high、他 medium。env で個別上書き可
-# 例: ITJUJIRYOU_EFFORT_SOUTHER=high
+# Thinking effort: ユウコ xhigh、他 high。env で個別上書き可
+# 例: ITJUJIRYOU_EFFORT_SOUTHER=xhigh
+# SDK 0.1.76+ の effort は "low" | "medium" | "high" | "xhigh" | "max"
 AGENT_EFFORT: dict[str, str] = {
     "souther":  "high",
-    "yuko":     "high",
-    "designer": "medium",
-    "engineer": "medium",
-    "writer":   "medium",
+    "yuko":     "xhigh",
+    "designer": "high",
+    "engineer": "high",
+    "writer":   "high",
 }
 
 
