@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 import os
+import random
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -112,6 +114,26 @@ PROMPT_FILES = {
 }
 
 
+def _extract_souther_quotes(text: str) -> list[str]:
+    """`### N.【場面タグ】` で始まる名台詞ブロックを切り出す。"""
+    parts = re.split(r"\n(?=### \d+\.)", text)
+    return [p.strip() for p in parts if re.match(r"### \d+\.", p)]
+
+
+def _spotlight_block(quotes_text: str, k: int = 3) -> str:
+    """21選から k 件をランダムに選び「今回の召喚で念頭に置く三選」セクションを返す。"""
+    items = _extract_souther_quotes(quotes_text)
+    if len(items) < k:
+        return ""
+    picks = random.sample(items, k)
+    header = (
+        "## 今回の召喚で念頭に置く三選\n\n"
+        "以下の三節を**この応答の軸**として、場面タグの精神を汲んで変奏せよ。"
+        "毎回同じ台詞を反復するな。案件の性質に応じて引き、必要なら一節だけ取って一句に編め。\n\n"
+    )
+    return "\n\n---\n\n" + header + "\n\n".join(picks)
+
+
 def load_prompt(agent: str) -> str:
     fname = PROMPT_FILES[agent]
     body = (PROMPTS_DIR / fname).read_text(encoding="utf-8")
@@ -119,11 +141,12 @@ def load_prompt(agent: str) -> str:
     motto_path = PROMPTS_DIR / "_company_motto.md"
     if motto_path.exists():
         body = body + "\n\n---\n\n" + motto_path.read_text(encoding="utf-8")
-    # 社長は名台詞集も自動連結
+    # 社長は名台詞集 + 召喚ごとのスポットライト3選
     if agent == "souther":
         quotes_path = PROMPTS_DIR / "souther_quotes.md"
         if quotes_path.exists():
-            body = body + "\n\n---\n\n" + quotes_path.read_text(encoding="utf-8")
+            quotes_text = quotes_path.read_text(encoding="utf-8")
+            body = body + "\n\n---\n\n" + quotes_text + _spotlight_block(quotes_text)
     return body
 
 

@@ -72,3 +72,17 @@ def test_president_prompt_includes_quotes():
     keys = ["天空に極星はふたつはいらぬ", "敵はすべて下郎", "もう一度ぬくもりを"]
     for k in keys:
         assert k in prompt, f"名台詞 '{k}' が prompt に含まれていない"
+
+
+def test_souther_prompt_spotlight_varies():
+    """召喚ごとに「今回の召喚で念頭に置く三選」がランダムで変わること。"""
+    from src.agents.base import load_prompt
+
+    spotlights: set[str] = set()
+    for _ in range(20):
+        prompt = load_prompt("souther")
+        marker = "## 今回の召喚で念頭に置く三選"
+        assert marker in prompt, "spotlight セクションが注入されていない"
+        spotlights.add(prompt[prompt.rfind(marker):])
+    # 21C3 = 1330 通り。20 回中で 2 種以上出ない確率は事実上ゼロ
+    assert len(spotlights) >= 2, "ランダム注入が機能していない（毎回同一）"
