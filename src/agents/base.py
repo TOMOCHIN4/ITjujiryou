@@ -114,14 +114,25 @@ PROMPT_FILES = {
 }
 
 
-def _extract_souther_quotes(text: str) -> list[str]:
-    """`### N.【場面タグ】` で始まる名台詞ブロックを切り出す。"""
+def _extract_souther_quotes(text: str) -> list[tuple[int, str]]:
+    """`### N.【場面タグ】` で始まる名台詞ブロックを (番号, 本文) で切り出す。"""
     parts = re.split(r"\n(?=### \d+\.)", text)
-    return [p.strip() for p in parts if re.match(r"### \d+\.", p)]
+    out: list[tuple[int, str]] = []
+    for p in parts:
+        m = re.match(r"### (\d+)\.", p)
+        if m:
+            out.append((int(m.group(1)), p.strip()))
+    return out
+
+
+SPOTLIGHT_LOG = REPO_ROOT / "data" / "logs" / "souther_spotlight.log"
 
 
 def _spotlight_block(quotes_text: str, k: int = 3) -> str:
-    """21選から k 件をランダムに選び「今回の召喚で念頭に置く三選」セクションを返す。"""
+    """21選から k 件をランダムに選び「今回の召喚で念頭に置く三選」セクションを返す。
+
+    選ばれた台詞番号を data/logs/souther_spotlight.log に1行追記する（観測用）。
+    """
     items = _extract_souther_quotes(quotes_text)
     if len(items) < k:
         return ""
@@ -131,7 +142,16 @@ def _spotlight_block(quotes_text: str, k: int = 3) -> str:
         "以下の三節を**この応答の軸**として、場面タグの精神を汲んで変奏せよ。"
         "毎回同じ台詞を反復するな。案件の性質に応じて引き、必要なら一節だけ取って一句に編め。\n\n"
     )
-    return "\n\n---\n\n" + header + "\n\n".join(picks)
+    body = "\n\n---\n\n" + header + "\n\n".join(text for _, text in picks)
+    try:
+        SPOTLIGHT_LOG.parent.mkdir(parents=True, exist_ok=True)
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).isoformat()
+        with SPOTLIGHT_LOG.open("a", encoding="utf-8") as f:
+            f.write(f"[{ts}] picks={[n for n, _ in picks]}\n")
+    except OSError:
+        pass
+    return body
 
 
 def load_prompt(agent: str) -> str:
