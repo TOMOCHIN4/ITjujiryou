@@ -115,7 +115,11 @@ PROMPT_FILES = {
 def load_prompt(agent: str) -> str:
     fname = PROMPT_FILES[agent]
     body = (PROMPTS_DIR / fname).read_text(encoding="utf-8")
-    # 社長は名台詞集を自動連結
+    # 全員に社訓を自動連結
+    motto_path = PROMPTS_DIR / "_company_motto.md"
+    if motto_path.exists():
+        body = body + "\n\n---\n\n" + motto_path.read_text(encoding="utf-8")
+    # 社長は名台詞集も自動連結
     if agent == "souther":
         quotes_path = PROMPTS_DIR / "souther_quotes.md"
         if quotes_path.exists():
