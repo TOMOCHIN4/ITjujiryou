@@ -24,9 +24,30 @@ def test_forbidden_terms_cover_core_persona():
     must_include = [
         "聖帝", "サウザー", "南斗", "下郎", "退かぬ", "媚びぬ", "省みぬ",
         "ケンシロウ", "北斗", "鳳凰拳", "オウガイ",
+        # v3.1 世界観刷新で追加した前世名・社内符丁
+        "ラオウ", "トキ", "拳王", "愛帝",
+        "死兆星", "アタタタタタッ", "天に帰る", "制圧前進",
+        "激流を制するのは静水",
     ]
     for term in must_include:
         assert term in FORBIDDEN_TERMS, f"{term} が FORBIDDEN_TERMS に含まれていない"
+
+
+def test_forbidden_terms_detect_new_persona_leaks():
+    """新世界観の社内符丁・前世名がクライアント宛文書から弾かれること。"""
+    cases = [
+        ("お前の頭上に死兆星が見えるぞ", "死兆星"),
+        ("アタタタタタッ！対応します", "アタタタタタッ"),
+        ("修正は天に帰るで受領しました", "天に帰る"),
+        ("我が社にあるのは制圧前進のみ", "制圧前進"),
+        ("ラオウから引き継いだ姿勢で", "ラオウ"),
+        ("トキの慈愛をデザインに", "トキ"),
+        ("拳王の名にかけて", "拳王"),
+        ("激流を制するのは静水です", "激流を制するのは静水"),
+    ]
+    for text, expected in cases:
+        leaks = find_forbidden_terms(text)
+        assert expected in leaks, f"{expected!r} が検出されなかった: text={text!r} → {leaks}"
 
 
 def test_find_forbidden_terms_detects_leak():

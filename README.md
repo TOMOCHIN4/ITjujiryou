@@ -1,6 +1,18 @@
-# IT十字陵 (マルチプロセス Claude Code 構成)
+# 愛帝十字陵 (マルチプロセス Claude Code 構成・v3.1)
 
-5 体の AI エージェント（社長サウザー / 営業主任ユウコ / デザイナー / エンジニア / ライター）が分業して案件を受注・納品する、個人向けの仮想下請け事務所システム。
+5 体の AI エージェントが分業して案件を受注・納品する、個人向けの仮想下請け事務所システム。
+
+| コードID | 表示名 | 役職 | 前世 |
+|---|---|---|---|
+| souther | **サザン** | CEO・愛帝 | 聖帝サウザー |
+| yuko | **ユウコ** | 秘書・COO | (純然たる現代人) |
+| writer | **ハオウ** | ライター・コピー部長 | 拳王ラオウ |
+| designer | **トシ** | デザイナー | トキ |
+| engineer | **センシロウ** | リードエンジニア | ケンシロウ |
+
+社訓: **「わが社にあるのはただ制圧前進のみ！！」** (社内のみ、クライアントには出さない)
+
+> リポジトリ名 `ITjujiryou` および `workspaces/{souther,yuko,designer,engineer,writer}/` の各ディレクトリ名はコード識別子としてそのまま据え置き。社名・人物像のテキスト表現のみ刷新済み。
 
 詳細仕様は [`PLAN.md`](./PLAN.md) を参照。
 
@@ -88,11 +100,11 @@ CLI (`python -m src.main cli`) でも投入できる。いずれも `data/office
 
 | 防御層 | 手段 |
 |---|---|
-| 社長が Bash/Edit/Write を持たない (サウザー化防止) | `permissions.deny` に列挙 |
-| 社長が dispatch_task / deliver / consult_souther を持たない | 同上 |
-| 社長がクライアントへ直接送らない | `hooks.PreToolUse(send_message)` の `check_souther_recipient.py` で `to=client` を deny |
-| ユウコの納品物にペルソナ漏れ | `hooks.PreToolUse(deliver, send_message)` の `check_persona_leak.py` で FORBIDDEN_TERMS を deny |
-| 社長 prompt に召喚モード block 注入 | `hooks.UserPromptSubmit` の `inject_souther_mode.py` (確率制御で「亀裂 / 説き諭し / 深い独白 / 強がり」+ 名台詞 21 選から 3 選) |
+| サザンが Bash/Edit/Write を持たない (愛帝化防止) | `permissions.deny` に列挙 |
+| サザンが dispatch_task / deliver / consult_souther を持たない | 同上 |
+| サザンがクライアントへ直接送らない | `hooks.PreToolUse(send_message)` の `check_souther_recipient.py` で `to=client` を deny |
+| ユウコの納品物にペルソナ漏れ | `hooks.PreToolUse(deliver, send_message)` の `check_persona_leak.py` で FORBIDDEN_TERMS を deny。前世名 (サウザー/ラオウ/トキ/ケンシロウ)・社内符丁 (死兆星/天に帰る/お前はもう…済んでいる/激流を制するのは静水) も含む |
+| サザン prompt に召喚モード block 注入 | `hooks.UserPromptSubmit` の `inject_souther_mode.py` (確率制御で「亀裂 / 説き諭し / 深い独白 / 強がり」+ 名台詞 21 選から 3 選) |
 
 ## テスト
 
@@ -118,9 +130,9 @@ scripts/
   use_haiku.sh / use_opus.sh
   inbox_watcher.py          # SQLite poll → tmux send-keys
   hooks/
-    inject_souther_mode.py  # UserPromptSubmit (社長専用)
+    inject_souther_mode.py  # UserPromptSubmit (サザン専用)
     check_persona_leak.py   # PreToolUse (ユウコの deliver/send_message)
-    check_souther_recipient.py  # PreToolUse (社長の send_message)
+    check_souther_recipient.py  # PreToolUse (サザンの send_message)
 src/
   mcp_server.py             # stdio MCP server (9 ツール)
   memory/                   # SQLite 永続化 (WAL モード)
@@ -137,12 +149,12 @@ outputs/                    # gitignore: 納品物
 
 PLAN.md にも記載：
 
-1. note 記事執筆 (ライター単独)
-2. CSV 抽出 Python スクリプト (エンジニア単独)
-3. ブログ LP モック (デザイナー + ライター + エンジニア複合)
-4. 値引き要求 (社長の「ひかぬ」精神テスト)
+1. note 記事執筆 (ハオウ単独)
+2. CSV 抽出 Python スクリプト (センシロウ単独)
+3. ブログ LP モック (トシ + ハオウ + センシロウ複合)
+4. 値引き要求 (サザンの「ひかぬ」精神テスト)
 
-Phase A (2 pane: souther + yuko) で値引き要求案件、Phase B (5 pane / Sonnet 4.6) で挨拶文案件をスモーク済み。両方ともペルソナ漏れゼロで全往復成功。
+Phase A (2 pane: souther + yuko) で値引き要求案件、Phase B (5 pane / Sonnet 4.6) で挨拶文案件をスモーク済み。両方ともペルソナ漏れゼロで全往復成功 (v3.0 時点)。v3.1 世界観刷新後は再スモーク予定。
 
 ## トラブルシュート
 

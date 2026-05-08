@@ -22,7 +22,7 @@ STAFF = ["souther", "yuko", "designer", "engineer", "writer"]
 WORKING_WINDOW_SEC = 30  # 直近イベントから何秒以内なら working とみなすか
 
 
-app = FastAPI(title="IT十字陵 Dashboard", version="0.2.0")
+app = FastAPI(title="愛帝十字陵 Dashboard", version="0.3.0")
 
 
 @app.get("/")

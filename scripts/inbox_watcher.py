@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""IT十字陵 inbox watcher。
+"""愛帝十字陵 inbox watcher。
 
 SQLite messages を 1 秒ごとに polling し、delivered_at が NULL の行を該当
 エージェントの tmux pane に `tmux send-keys` で投入する。

@@ -1,4 +1,4 @@
-"""IT十字陵 stdio MCP サーバ。
+"""愛帝十字陵 stdio MCP サーバ。
 
 各 Claude Code プロセス (workspaces/{role}/) が `.mcp.json` 経由でこのサーバを参照する。
 registry.py のロジックをマルチプロセス前提に書き換えたもの。

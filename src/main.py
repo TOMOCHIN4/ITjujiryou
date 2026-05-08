@@ -1,4 +1,4 @@
-"""IT十字陵 CLI エントリポイント (マルチプロセス構成)。
+"""愛帝十字陵 CLI エントリポイント (マルチプロセス構成)。
 
 使い方:
     python -m src.main init                          # DB 初期化
@@ -35,7 +35,7 @@ async def cmd_cli() -> None:
     await store.init()
 
     print("=" * 60)
-    print("IT十字陵 CLI 発注口")
+    print("愛帝十字陵 CLI 発注口")
     print("先に ./scripts/start_office.sh で事務所を起動しておいてください。")
     print("'exit' で終了。空行送信で確定。複数行入力可。")
     print("=" * 60)
@@ -84,7 +84,7 @@ async def cmd_serve(host: str = "127.0.0.1", port: int = 8000) -> None:
 
     config = uvicorn.Config(app, host=host, port=port, log_level="info")
     server = uvicorn.Server(config)
-    print(f"IT十字陵 ダッシュボード起動: http://{host}:{port}")
+    print(f"愛帝十字陵 ダッシュボード起動: http://{host}:{port}")
     await server.serve()
 
 

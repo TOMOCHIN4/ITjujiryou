@@ -1,11 +1,11 @@
-// IT十字陵 ダッシュボード フロント
+// 愛帝十字陵 ダッシュボード フロント
 
 const STAFF_META = {
-  souther:  { icon: "👑", name: "サウザー", role: "社長" },
-  yuko:     { icon: "💼", name: "ユウコ",   role: "営業主任" },
-  designer: { icon: "🎨", name: "デザイナー", role: "" },
-  engineer: { icon: "🛠", name: "エンジニア", role: "" },
-  writer:   { icon: "✍️", name: "ライター",   role: "" },
+  souther:  { icon: "👑", name: "サザン",      role: "CEO・愛帝" },
+  yuko:     { icon: "💼", name: "ユウコ",      role: "秘書・COO" },
+  designer: { icon: "🎨", name: "トシ",        role: "デザイナー" },
+  engineer: { icon: "🛠", name: "センシロウ",  role: "リードエンジニア" },
+  writer:   { icon: "✍️", name: "ハオウ",      role: "ライター・コピー部長" },
   client:   { icon: "📩", name: "クライアント", role: "" },
   system:   { icon: "⚙️", name: "system",     role: "" },
 };
