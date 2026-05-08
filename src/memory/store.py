@@ -210,6 +210,24 @@ class Store:
             )
             return [dict(r) for r in await cur.fetchall()]
 
+    async def list_messages_by_agent(
+        self,
+        agent: str,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """from_agent または to_agent が指定エージェントのメッセージを新→旧で limit 件。
+
+        ピクセル UI のサイドパネル「過去のやり取り」で使用。
+        """
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                "SELECT * FROM messages WHERE from_agent=? OR to_agent=? "
+                "ORDER BY timestamp DESC LIMIT ?",
+                (agent, agent, int(limit)),
+            )
+            return [dict(r) for r in await cur.fetchall()]
+
     # --- deliverables ---
     async def add_deliverable(
         self,

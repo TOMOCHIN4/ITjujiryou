@@ -16,6 +16,7 @@ from src.ui.broker import broker
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+PIXEL_DIR = STATIC_DIR / "pixel"
 OUTPUTS_DIR = REPO_ROOT / "outputs"
 
 STAFF = ["souther", "yuko", "designer", "engineer", "writer"]
@@ -85,6 +86,32 @@ async def api_list_events(
     since_id: Optional[int] = None,
 ) -> list[dict[str, Any]]:
     return await get_store().list_events(task_id=task_id, limit=limit, since_id=since_id)
+
+
+@app.get("/pixel")
+@app.get("/pixel/")
+async def pixel_index() -> FileResponse:
+    """事務所俯瞰ピクセル UI のエントリポイント (Phase 1)。"""
+    return FileResponse(PIXEL_DIR / "index.html")
+
+
+@app.get("/api/staff/{agent}/profile")
+async def api_staff_profile(agent: str) -> dict[str, Any]:
+    """ピクセル UI のサイドパネル用。担当中タスク + 直近メッセージ + 最新自発イベントを返す。"""
+    if agent not in STAFF:
+        raise HTTPException(status_code=404, detail="unknown agent")
+    store = get_store()
+    all_assigned = await store.list_tasks(assigned_to=agent)
+    active_tasks = [t for t in all_assigned if t.get("status") != "delivered"]
+    recent_messages = await store.list_messages_by_agent(agent, limit=20)
+    events = await store.list_events(limit=200)
+    latest_self_event = next((e for e in events if e.get("agent") == agent), None)
+    return {
+        "agent": agent,
+        "active_tasks": active_tasks,
+        "recent_messages": recent_messages,
+        "latest_event": latest_self_event,
+    }
 
 
 @app.get("/api/staff")
@@ -197,8 +224,10 @@ def _event_to_payload(ev: dict[str, Any]) -> dict[str, Any]:
 
 # 静的マウント (404 を返さないよう、ディレクトリが無くても作っておく)
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
+PIXEL_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/pixel-static", StaticFiles(directory=PIXEL_DIR), name="pixel-static")
 app.mount("/outputs", StaticFiles(directory=OUTPUTS_DIR), name="outputs")
 
 

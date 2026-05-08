@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>愛帝十字陵 — 事務所俯瞰ビュー</title>
+<link rel="stylesheet" href="/pixel-static/pixel.css" />
+</head>
+<body>
+  <header class="pixel-header">
+    <div class="brand">愛帝十字陵 <span class="sub">事務所俯瞰ビュー (Phase 1)</span></div>
+    <div class="conn">
+      <span id="ws-dot" class="dot offline"></span>
+      <span id="ws-label">接続待機</span>
+      <a class="debug-link" href="/" title="HTMLダッシュボード (デバッグ用)">debug</a>
+    </div>
+  </header>
+
+  <main class="pixel-main">
+    <section class="canvas-wrap">
+      <div id="pixi-root"></div>
+      <p class="hint">キャラクターをクリックすると詳細パネルが開きます</p>
+    </section>
+
+    <aside id="profile-panel" hidden>
+      <header>
+        <span id="panel-icon"></span>
+        <span id="panel-name"></span>
+        <span id="panel-role" class="panel-role"></span>
+        <button id="panel-close" type="button" aria-label="閉じる">✕</button>
+      </header>
+      <section class="panel-section">
+        <h3>現在の担当タスク <span id="active-count" class="count">0</span></h3>
+        <ul id="active-tasks" class="task-list"></ul>
+      </section>
+      <section class="panel-section">
+        <h3>最新のアクション</h3>
+        <p id="latest-event" class="latest-event">—</p>
+      </section>
+      <section class="panel-section">
+        <h3>過去のやり取り (直近20件)</h3>
+        <ul id="recent-messages" class="message-list"></ul>
+      </section>
+    </aside>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+  <script type="module" src="/pixel-static/pixel.js"></script>
+</body>
+</html>

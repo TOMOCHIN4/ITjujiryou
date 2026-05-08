@@ -1,0 +1,263 @@
+/* 愛帝十字陵 — 事務所俯瞰ピクセル UI (Phase 1)
+ * canvas 左 / aside 右 / header 上 の3分割。仮素材は PixiJS Graphics + 絵文字で構成。
+ */
+
+:root {
+  --bg: #1b1825;
+  --bg-2: #2a2438;
+  --panel: #1f1a2c;
+  --panel-2: #2c2540;
+  --fg: #e8e6f3;
+  --fg-dim: #a09cc0;
+  --accent: #b18cff;
+  --ok: #88d8a3;
+  --warn: #ffd17a;
+  --bad: #ff8a8a;
+  --line: #3a3450;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+  font-size: 14px;
+  /* ピクセルアートの再描画を妨げないように画像レンダリングを pixelated 寄りに */
+  image-rendering: pixelated;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pixel-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.pixel-header .brand {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.pixel-header .brand .sub {
+  margin-left: 8px;
+  color: var(--fg-dim);
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.conn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+
+.conn .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #555;
+}
+.conn .dot.online  { background: var(--ok);   box-shadow: 0 0 6px var(--ok); }
+.conn .dot.offline { background: #555; }
+
+.debug-link {
+  margin-left: 8px;
+  color: var(--fg-dim);
+  text-decoration: none;
+  border: 1px solid var(--line);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.debug-link:hover { color: var(--fg); border-color: var(--fg-dim); }
+
+.pixel-main {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0; /* flex で overflow できるように */
+}
+
+.canvas-wrap {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 16px;
+  overflow: auto;
+}
+
+#pixi-root {
+  width: 800px;
+  height: 600px;
+  background: #000;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+#pixi-root canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.hint {
+  margin: 8px 0 0;
+  color: var(--fg-dim);
+  font-size: 11px;
+}
+
+#profile-panel {
+  flex: 0 0 360px;
+  max-width: 360px;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#profile-panel[hidden] { display: none !important; }
+
+#profile-panel header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+}
+
+#panel-icon { font-size: 22px; }
+#panel-name { font-size: 16px; font-weight: 700; }
+#panel-role { color: var(--fg-dim); font-size: 12px; flex: 1; }
+
+#panel-close {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--fg-dim);
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+#panel-close:hover { color: var(--fg); border-color: var(--fg-dim); }
+
+.panel-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  overflow-y: auto;
+}
+
+.panel-section:last-child {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.panel-section h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+}
+
+.count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  background: var(--bg-2);
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--fg);
+}
+
+.task-list, .message-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.task-list li {
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  background: var(--bg-2);
+  border-left: 3px solid var(--accent);
+  border-radius: 3px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.task-list li .status {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  background: var(--bg);
+  color: var(--fg-dim);
+}
+
+.task-list li .status[data-status="in_progress"] { color: var(--warn); border: 1px solid var(--warn); }
+.task-list li .status[data-status="review"]      { color: var(--accent); border: 1px solid var(--accent); }
+.task-list li .status[data-status="approved"]    { color: var(--ok); border: 1px solid var(--ok); }
+.task-list li .status[data-status="hearing"]     { color: var(--fg-dim); border: 1px solid var(--fg-dim); }
+
+.task-list .empty, .message-list .empty {
+  padding: 8px 0;
+  color: var(--fg-dim);
+  font-size: 12px;
+}
+
+.latest-event {
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--bg-2);
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--fg);
+}
+
+.message-list li {
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--line);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--fg);
+}
+
+.message-list li:last-child { border-bottom: none; }
+
+.message-list .meta {
+  color: var(--fg-dim);
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+
+.message-list .arrow {
+  color: var(--accent);
+  margin: 0 4px;
+}
+
+.message-list .body {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
