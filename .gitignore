@@ -17,4 +17,5 @@ scripts/gen-asset/venv/
 
 # 個人参照資料
 *.rtf
+*.rtfd/
 
