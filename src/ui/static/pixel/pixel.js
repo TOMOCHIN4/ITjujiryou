@@ -4,6 +4,8 @@
 import { createScene } from "/pixel-static/scene.js";
 import { dispatch } from "/pixel-static/eventMap.js";
 import { CHAR_DEFS } from "/pixel-static/characters.js";
+import { loadStaffTextures } from "/pixel-static/spriteLoader.js";
+import { makeAnimator } from "/pixel-static/animation.js";
 
 // ---- DOM 参照 ----
 const $ = (sel) => document.querySelector(sel);
@@ -19,10 +21,22 @@ const activeTasks = $("#active-tasks");
 const latestEvent = $("#latest-event");
 const recentMessages = $("#recent-messages");
 
-// ---- シーン構築 ----
-const scene = await createScene($("#pixi-root"), { onCharClick: openPanel });
+// ---- スプライト読み込み + シーン構築 ----
+const textures = await loadStaffTextures();   // 失敗時は null → Phase 1 フォールバック
+const scene = await createScene($("#pixi-root"), {
+  onCharClick: openPanel,
+  textures,
+});
+const animator = makeAnimator(scene.charactersById);
+window.__pixelDebug = { scene, animator };  // デバッグコンソールから操作するためのフック
 
 // ---- WebSocket ----
+// 接続直後はサーバが過去 100 件のスナップショットを一気に送ってくる。
+// これらは "今このタイミング" のイベントではないので、
+// 描画 (吹き出し / 歩行) を抑止して state だけを最新に追従させる。
+const SNAPSHOT_QUIET_MS = 1500;
+let snapshotEnd = 0;
+
 function connectWs() {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   const url = `${proto}//${location.host}/ws/events`;
@@ -32,6 +46,7 @@ function connectWs() {
     wsDot.classList.remove("offline");
     wsDot.classList.add("online");
     wsLabel.textContent = "connected";
+    snapshotEnd = Date.now() + SNAPSHOT_QUIET_MS;
   });
 
   ws.addEventListener("close", () => {
@@ -41,15 +56,17 @@ function connectWs() {
     setTimeout(connectWs, 2000);
   });
 
-  ws.addEventListener("error", () => {
-    // close で拾う
-  });
+  ws.addEventListener("error", () => { /* close で拾う */ });
 
   ws.addEventListener("message", (e) => {
     let data;
     try { data = JSON.parse(e.data); } catch { return; }
     if (data?.type !== "event") return;
-    dispatch(data, scene);
+
+    // スナップショット期間中は描画を抑止 (state 切替も歩行も止める)
+    if (Date.now() < snapshotEnd) return;
+
+    dispatch(data, scene, animator);
   });
 }
 connectWs();

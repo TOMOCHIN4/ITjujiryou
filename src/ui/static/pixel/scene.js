@@ -1,10 +1,11 @@
 // PixiJS シーン構築。事務所俯瞰ビュー (床 / 家具 / キャラ / 吹き出し)。
-// PixiJS v8.6 を CDN から読み込み、グローバル PIXI を使う。
+// PixiJS v8 を CDN グローバル PIXI として使う。
+// Phase 2: キャラは textures (sprite sheet) があれば AnimatedSprite、なければ Graphics 矩形にフォールバック。
 
 import { CHAR_DEFS, CANVAS_W, CANVAS_H, buildCharacter, isStaff } from "/pixel-static/characters.js";
 import { spawnBubble } from "/pixel-static/speech.js";
 
-export async function createScene(rootEl, { onCharClick }) {
+export async function createScene(rootEl, { onCharClick, textures = null }) {
   const app = new PIXI.Application();
   await app.init({
     width: CANVAS_W,
@@ -39,10 +40,10 @@ export async function createScene(rootEl, { onCharClick }) {
   const furniture = new PIXI.Container();
   furniture.zIndex = 10;
 
-  // 玉座 (souther の後ろ)
+  // 玉座 (サザンの後ろ)
   furniture.addChild(
     new PIXI.Graphics()
-      .roundRect(CHAR_DEFS.souther.x - 40, CHAR_DEFS.souther.y - 60, 80, 50, 8)
+      .roundRect(CHAR_DEFS.souther.x - 48, CHAR_DEFS.souther.y - 70, 96, 60, 8)
       .fill({ color: 0x4a3a6e, alpha: 0.85 })
       .stroke({ color: 0xb18cff, width: 2, alpha: 0.7 })
   );
@@ -52,20 +53,20 @@ export async function createScene(rootEl, { onCharClick }) {
     const def = CHAR_DEFS[id];
     furniture.addChild(
       new PIXI.Graphics()
-        .roundRect(def.x - 36, def.y + 22, 72, 14, 3)
+        .roundRect(def.x - 42, def.y + 36, 84, 16, 3)
         .fill({ color: 0x3a3450 })
         .stroke({ color: 0x55456a, width: 1 })
     );
   });
 
-  // 部屋の壁 (枠)
+  // 部屋の壁
   furniture.addChild(
     new PIXI.Graphics()
       .roundRect(20, 30, CANVAS_W - 40, CANVAS_H - 50, 8)
       .stroke({ color: 0x55456a, width: 2 })
   );
 
-  // 玄関ラベル (左下)
+  // 玄関ラベル
   const door = new PIXI.Graphics()
     .roundRect(30, CANVAS_H - 60, 60, 28, 4)
     .fill({ color: 0x1a1525 })
@@ -84,7 +85,7 @@ export async function createScene(rootEl, { onCharClick }) {
   doorLabel.y = CANVAS_H - 46;
   furniture.addChild(doorLabel);
 
-  // タイトル (上中央)
+  // タイトル
   const title = new PIXI.Text({
     text: "愛帝十字陵 — 7F オフィス",
     style: {
@@ -107,7 +108,7 @@ export async function createScene(rootEl, { onCharClick }) {
   charLayer.sortableChildren = true;
   const charactersById = {};
   for (const [agent, def] of Object.entries(CHAR_DEFS)) {
-    const c = buildCharacter(agent, def, onCharClick);
+    const c = buildCharacter(agent, def, onCharClick, textures);
     charLayer.addChild(c);
     charactersById[agent] = c;
   }
@@ -119,36 +120,23 @@ export async function createScene(rootEl, { onCharClick }) {
   overlay.sortableChildren = true;
   stage.addChild(overlay);
 
-  // バブル積み上げ管理
   const bubbleStacks = new Map();
 
-  /** scene API: 指定キャラの頭上に吹き出しを表示 */
+  /** scene API: 指定キャラの **現在位置** に吹き出しを出す (歩行中は追随) */
   function bubble(agent, text, ttlMs = 3000) {
-    if (!isStaff(agent)) return; // クライアントや system は無視
-    const def = CHAR_DEFS[agent];
-    spawnBubble(overlay, def, text, ttlMs, bubbleStacks, agent);
-  }
-
-  /** 一時的にキャラを発光 (現在は未使用、Phase 2 で歩行アニメ等に拡張可) */
-  function pulse(agent) {
+    if (!isStaff(agent)) return;
     const c = charactersById[agent];
-    if (!c) return;
-    let t = 0;
-    const fn = (ticker) => {
-      t += ticker.deltaMS;
-      c.scale.set(1 + Math.sin(t / 80) * 0.04);
-      if (t > 600) {
-        c.scale.set(1);
-        PIXI.Ticker.shared.remove(fn);
-      }
-    };
-    PIXI.Ticker.shared.add(fn);
+    const def = CHAR_DEFS[agent];
+    // 初期位置はキャラの現在座標 (歩行中なら walking 中の位置)
+    const initialPos = c ? { x: c.x, y: c.y } : def;
+    const getPos = c ? () => ({ x: c.x, y: c.y }) : null;
+    spawnBubble(overlay, initialPos, text, ttlMs, bubbleStacks, agent, getPos);
   }
 
   return {
     app,
     bubble,
-    pulse,
+    charactersById,
     destroy: () => app.destroy(true, { children: true }),
   };
 }
