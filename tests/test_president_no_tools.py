@@ -1,88 +1,113 @@
-"""社長サウザーが実務ツールを物理的に持たないこと（サウザー化防止）。"""
-from src.agents.president import build_president_options
-from src.agents.base import AGENT_TOOLS, mcp_tool
+"""社長の物理的権限剥奪の検証 (PLAN.md §10.1 サウザー化防止)。
+
+マルチプロセス構成では、社長 (workspaces/souther) の Claude Code プロセスが
+permissions.deny で実務ツールを完全に遮断されていることをファイルレベルで保証する。
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SOUTHER_SETTINGS = REPO_ROOT / "workspaces" / "souther" / ".claude" / "settings.json"
+YUKO_SETTINGS = REPO_ROOT / "workspaces" / "yuko" / ".claude" / "settings.json"
+
+SOUTHER_FORBIDDEN_TOOLS = [
+    "Bash", "Edit", "Write", "MultiEdit", "NotebookEdit",
+    "WebSearch", "WebFetch", "TodoWrite",
+    "mcp__itjujiryou__dispatch_task",
+    "mcp__itjujiryou__deliver",
+    "mcp__itjujiryou__evaluate_deliverable",
+    "mcp__itjujiryou__propose_plan",
+    "mcp__itjujiryou__consult_souther",
+]
+
+SOUTHER_REQUIRED_TOOLS = [
+    "mcp__itjujiryou__send_message",
+    "mcp__itjujiryou__read_status",
+    "Read",
+]
 
 
-def test_president_has_no_implementation_tools():
-    options = build_president_options()
-    forbidden = ["Bash", "Edit", "Write", "WebSearch", "WebFetch"]
-    for t in forbidden:
-        assert t not in options["allowed_tools"], (
-            f"社長が {t} を持っている。サウザー化のリスク。"
+def _load(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_souther_settings_exists():
+    assert SOUTHER_SETTINGS.exists(), f"{SOUTHER_SETTINGS} が存在しない"
+
+
+def test_souther_denies_all_implementation_tools():
+    settings = _load(SOUTHER_SETTINGS)
+    deny = settings.get("permissions", {}).get("deny", [])
+    for tool in SOUTHER_FORBIDDEN_TOOLS:
+        assert tool in deny, (
+            f"社長 settings.json に {tool} が deny されていない。サウザー化リスク。"
         )
 
 
-def test_president_has_required_tools():
-    options = build_president_options()
-    assert mcp_tool("send_message") in options["allowed_tools"]
-    assert mcp_tool("read_status") in options["allowed_tools"]
-    assert "Read" in options["allowed_tools"]
+def test_souther_allows_only_required_tools():
+    settings = _load(SOUTHER_SETTINGS)
+    allow = settings.get("permissions", {}).get("allow", [])
+    for tool in SOUTHER_REQUIRED_TOOLS:
+        assert tool in allow, f"社長 settings.json に {tool} が allow されていない"
 
 
-def test_president_cannot_dispatch_or_deliver():
-    """dispatch_task と deliver はユウコ専用であり、社長は持ってはいけない。"""
-    tools = AGENT_TOOLS["souther"]
-    assert mcp_tool("dispatch_task") not in tools
-    assert mcp_tool("deliver") not in tools
+def test_souther_has_userpromptsubmit_hook():
+    """召喚モード block 注入 hook が UserPromptSubmit に登録されていること。"""
+    settings = _load(SOUTHER_SETTINGS)
+    hooks = settings.get("hooks", {}).get("UserPromptSubmit", [])
+    assert hooks, "UserPromptSubmit hook が未登録"
+    found = any(
+        "inject_souther_mode.py" in (h.get("command") or "")
+        for entry in hooks
+        for h in entry.get("hooks", [])
+    )
+    assert found, "inject_souther_mode.py が UserPromptSubmit hook に未登録"
 
 
-def test_subordinates_cannot_dispatch_or_deliver():
-    for agent in ("designer", "engineer", "writer"):
-        tools = AGENT_TOOLS[agent]
-        assert mcp_tool("dispatch_task") not in tools, f"{agent} が dispatch を持つ"
-        assert mcp_tool("deliver") not in tools, f"{agent} が deliver を持つ"
+def test_souther_has_recipient_check_hook():
+    """social hook: send_message PreToolUse で to=client を deny する hook。"""
+    settings = _load(SOUTHER_SETTINGS)
+    pre = settings.get("hooks", {}).get("PreToolUse", [])
+    found = any(
+        "check_souther_recipient.py" in (h.get("command") or "")
+        for entry in pre
+        if entry.get("matcher") == "mcp__itjujiryou__send_message"
+        for h in entry.get("hooks", [])
+    )
+    assert found, "check_souther_recipient.py が PreToolUse hook に未登録"
 
 
-def test_yuko_has_dispatch_and_deliver():
-    tools = AGENT_TOOLS["yuko"]
-    assert mcp_tool("dispatch_task") in tools
-    assert mcp_tool("deliver") in tools
+def test_yuko_has_persona_leak_hook():
+    """ユウコ: deliver と send_message のクライアント宛ペルソナ漏れチェック hook。"""
+    settings = _load(YUKO_SETTINGS)
+    pre = settings.get("hooks", {}).get("PreToolUse", [])
+    matchers_with_check: set[str] = set()
+    for entry in pre:
+        for h in entry.get("hooks", []):
+            if "check_persona_leak.py" in (h.get("command") or ""):
+                matchers_with_check.add(entry.get("matcher", ""))
+    assert "mcp__itjujiryou__deliver" in matchers_with_check, "deliver の persona-leak hook 不在"
+    assert "mcp__itjujiryou__send_message" in matchers_with_check, "send_message の persona-leak hook 不在"
 
 
-# --- Phase 1.5 追加 -------------------------------------------------------
-def test_yuko_has_quality_loop_tools():
-    tools = AGENT_TOOLS["yuko"]
-    assert mcp_tool("propose_plan") in tools
-    assert mcp_tool("evaluate_deliverable") in tools
+def test_yuko_can_dispatch_and_deliver():
+    settings = _load(YUKO_SETTINGS)
+    allow = settings.get("permissions", {}).get("allow", [])
+    for tool in (
+        "mcp__itjujiryou__dispatch_task",
+        "mcp__itjujiryou__deliver",
+        "mcp__itjujiryou__consult_souther",
+        "mcp__itjujiryou__propose_plan",
+        "mcp__itjujiryou__evaluate_deliverable",
+    ):
+        assert tool in allow, f"ユウコ settings.json に {tool} が allow されていない"
 
 
-def test_president_has_no_quality_loop_tools():
-    tools = AGENT_TOOLS["souther"]
-    for t in ("propose_plan", "evaluate_deliverable", "consult_peer", "deliver", "dispatch_task"):
-        assert mcp_tool(t) not in tools, f"社長が {t} を持つ"
-
-
-def test_subordinates_have_consult_peer():
-    for agent in ("designer", "engineer", "writer"):
-        assert mcp_tool("consult_peer") in AGENT_TOOLS[agent]
-
-
-def test_subordinates_no_evaluate_or_propose():
-    for agent in ("designer", "engineer", "writer"):
-        tools = AGENT_TOOLS[agent]
-        assert mcp_tool("evaluate_deliverable") not in tools
-        assert mcp_tool("propose_plan") not in tools
-
-
-def test_president_prompt_includes_quotes():
-    """社長 prompt に名台詞集が連結されていること。"""
-    from src.agents.base import load_prompt
-    prompt = load_prompt("souther")
-    # 代表的なキーフレーズをチェック
+def test_souther_claude_md_contains_quotes():
+    """社長 CLAUDE.md に名台詞集 (21選) が含まれていること。"""
+    claude_md = (REPO_ROOT / "workspaces" / "souther" / "CLAUDE.md").read_text(encoding="utf-8")
     keys = ["天空に極星はふたつはいらぬ", "敵はすべて下郎", "もう一度ぬくもりを"]
     for k in keys:
-        assert k in prompt, f"名台詞 '{k}' が prompt に含まれていない"
-
-
-def test_souther_prompt_spotlight_varies():
-    """召喚ごとに「今回の召喚で念頭に置く三選」がランダムで変わること。"""
-    from src.agents.base import load_prompt
-
-    spotlights: set[str] = set()
-    for _ in range(20):
-        prompt = load_prompt("souther")
-        marker = "## 今回の召喚で念頭に置く三選"
-        assert marker in prompt, "spotlight セクションが注入されていない"
-        spotlights.add(prompt[prompt.rfind(marker):])
-    # 21C3 = 1330 通り。20 回中で 2 種以上出ない確率は事実上ゼロ
-    assert len(spotlights) >= 2, "ランダム注入が機能していない（毎回同一）"
+        assert k in claude_md, f"名台詞 '{k}' が CLAUDE.md に含まれていない"

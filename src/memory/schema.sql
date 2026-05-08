@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS messages (
     to_agent TEXT NOT NULL,
     content TEXT NOT NULL,
     message_type TEXT NOT NULL,
-    timestamp TEXT NOT NULL
+    timestamp TEXT NOT NULL,
+    delivered_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS deliverables (
@@ -50,7 +51,8 @@ CREATE TABLE IF NOT EXISTS events (
     agent TEXT NOT NULL,
     event_type TEXT NOT NULL,
     task_id TEXT REFERENCES tasks(id),
-    details TEXT
+    details TEXT,
+    parent_event_id INTEGER REFERENCES events(id)
 );
 
 -- 初期計画 (Phase 1.5)
@@ -74,8 +76,11 @@ CREATE TABLE IF NOT EXISTS revisions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_task ON messages(task_id);
+CREATE INDEX IF NOT EXISTS idx_messages_undelivered
+    ON messages(delivered_at) WHERE delivered_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id);
 CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
+CREATE INDEX IF NOT EXISTS idx_events_parent ON events(parent_event_id);
 CREATE INDEX IF NOT EXISTS idx_plans_task ON plans(task_id);
 CREATE INDEX IF NOT EXISTS idx_revisions_task ON revisions(task_id);
 CREATE INDEX IF NOT EXISTS idx_revisions_subtask ON revisions(subtask_id);

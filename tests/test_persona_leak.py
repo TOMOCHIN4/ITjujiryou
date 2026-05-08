@@ -1,9 +1,23 @@
 """ペルソナ境界: クライアント向け応答に内部用語が含まれないこと。
 
-ライブ E2E は claude-agent-sdk と OAuth ログインが必要なため、ここでは
-FORBIDDEN_TERMS リストの完全性とフィルタ関数の挙動のみを検証する。
+マルチプロセス構成では、ライブ E2E は tmux + Claude Code の OAuth セッションが必要。
+ここでは以下を検証する:
+1. FORBIDDEN_TERMS リストの完全性
+2. find_forbidden_terms フィルタの挙動
+3. PreToolUse hook (`scripts/hooks/check_persona_leak.py`) が漏れを deny すること
+4. PreToolUse hook (`scripts/hooks/check_souther_recipient.py`) が社長の to=client を deny すること
 """
-from src.reception import FORBIDDEN_TERMS, find_forbidden_terms
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+from src.persona import FORBIDDEN_TERMS, find_forbidden_terms
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+PYTHON = sys.executable
 
 
 def test_forbidden_terms_cover_core_persona():
@@ -27,71 +41,66 @@ def test_find_forbidden_terms_clean_passes():
     assert find_forbidden_terms(clean) == []
 
 
-# ---- handle_client_message の retry / mask フロー ----
-
-import pytest
+# ---- hook の挙動 ----
 
 
-@pytest.fixture
-def isolated_store(tmp_path_factory, monkeypatch):
-    """テスト用の隔離 DB を用意し、シングルトンを破棄。"""
-    db_path = tmp_path_factory.mktemp("persona") / "test.db"
-    monkeypatch.setenv("ITJUJIRYOU_DB_PATH", str(db_path))
-    import src.memory.store as store_mod
-    store_mod._store_singleton = None  # type: ignore[attr-defined]
-    import asyncio
-    asyncio.run(store_mod.get_store().init())
-    yield store_mod
-    store_mod._store_singleton = None  # type: ignore[attr-defined]
+def _run_hook(script: str, event: dict) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [PYTHON, str(REPO_ROOT / "scripts" / "hooks" / script)],
+        input=json.dumps(event),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
 
 
-@pytest.mark.asyncio
-async def test_clean_response_no_retry(isolated_store, monkeypatch):
-    """ペルソナ漏れ無しなら retry されないこと。"""
-    calls = []
-
-    async def fake_run_yuko(text, task_id=None):
-        calls.append(text)
-        return "お客様\n\nお世話になっております。"
-
-    monkeypatch.setattr("src.reception.run_yuko", fake_run_yuko)
-    from src.reception import handle_client_message
-    out = await handle_client_message("テスト発注")
-    assert out.startswith("お客様")
-    assert len(calls) == 1  # retry されていない
+def test_persona_leak_hook_denies_deliver_with_forbidden():
+    ev = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "mcp__itjujiryou__deliver",
+        "tool_input": {"delivery_message": "お客様、ふん、聖帝の流儀により納品します"},
+    }
+    r = _run_hook("check_persona_leak.py", ev)
+    assert r.returncode == 2, f"deny されなかった: stderr={r.stderr}"
+    assert "ふん、" in r.stderr or "聖帝" in r.stderr
 
 
-@pytest.mark.asyncio
-async def test_leak_then_clean_on_retry(isolated_store, monkeypatch):
-    """初回漏れ→retry でクリーンになれば、その本文がそのまま返ること。"""
-    n = {"i": 0}
-
-    async def fake_run_yuko(text, task_id=None):
-        n["i"] += 1
-        if n["i"] == 1:
-            return "お客様、ふん、下郎よ。承りました。"  # 漏れあり
-        return "お客様、承りました。"  # クリーン
-
-    monkeypatch.setattr("src.reception.run_yuko", fake_run_yuko)
-    from src.reception import handle_client_message
-    out = await handle_client_message("テスト発注")
-    assert "下郎" not in out and "ふん、" not in out
-    assert out == "お客様、承りました。"
-    assert n["i"] == 2  # retry が起きた
+def test_persona_leak_hook_passes_clean_deliver():
+    ev = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "mcp__itjujiryou__deliver",
+        "tool_input": {"delivery_message": "お客様、ご依頼の件、納品いたします。"},
+    }
+    r = _run_hook("check_persona_leak.py", ev)
+    assert r.returncode == 0, f"clean でも deny された: stderr={r.stderr}"
 
 
-@pytest.mark.asyncio
-async def test_double_leak_triggers_mask(isolated_store, monkeypatch):
-    """retry 後も漏れたら強制マスク (■) されること。"""
-    n = {"i": 0}
+def test_persona_leak_hook_skips_internal_send_message():
+    """社内通信 (to != client) はペルソナ用語を含んでも素通しすること。"""
+    ev = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "mcp__itjujiryou__send_message",
+        "tool_input": {"to": "yuko", "content": "ふん、下郎の頼みは却下せよ"},
+    }
+    r = _run_hook("check_persona_leak.py", ev)
+    assert r.returncode == 0, "社内通信が誤って deny された"
 
-    async def fake_run_yuko(text, task_id=None):
-        n["i"] += 1
-        return "お客様、ふん、下郎よ。承りました。"  # 何度呼んでも漏れる
 
-    monkeypatch.setattr("src.reception.run_yuko", fake_run_yuko)
-    from src.reception import handle_client_message
-    out = await handle_client_message("テスト発注")
-    assert "下郎" not in out and "ふん、" not in out
-    assert "■" in out  # マスク済み
-    assert n["i"] == 2  # 1回 retry までで止まる
+def test_souther_recipient_hook_denies_to_client():
+    ev = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "mcp__itjujiryou__send_message",
+        "tool_input": {"to": "client", "content": "勝手に送る"},
+    }
+    r = _run_hook("check_souther_recipient.py", ev)
+    assert r.returncode == 2, f"deny されなかった: stderr={r.stderr}"
+
+
+def test_souther_recipient_hook_allows_to_yuko():
+    ev = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "mcp__itjujiryou__send_message",
+        "tool_input": {"to": "yuko", "content": "ふん、許す"},
+    }
+    r = _run_hook("check_souther_recipient.py", ev)
+    assert r.returncode == 0

@@ -127,18 +127,40 @@ class OrderRequest(BaseModel):
 
 @app.post("/api/orders")
 async def api_post_order(req: OrderRequest) -> dict[str, Any]:
+    """マルチプロセス構成では DB に投入して即 return する。
+    ユウコ pane は inbox_watcher 経由で起動され、応答は WS /ws/events で配信される。
+    """
     text = req.text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="text is required")
-    # 遅延 import（claude-agent-sdk 起動を REST 解決まで遅らせる）
-    from src.reception import handle_client_message
 
-    response = await handle_client_message(text, task_id=req.task_id)
-    # 直近に作成された task_id を返す。reception 側で task が必ず確定する。
-    # 簡便に最新 1 件を引いて返す（同時並行発注は Phase 2.x 以降で扱う）。
-    tasks = await get_store().list_tasks()
-    task_id = tasks[0]["id"] if tasks else None
-    return {"task_id": task_id, "response": response}
+    store = get_store()
+    if req.task_id:
+        task = await store.get_task(req.task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail=f"task {req.task_id} not found")
+        task_id = req.task_id
+    else:
+        title = text.splitlines()[0][:60] or "(無題)"
+        task_id = await store.create_task(
+            title=title,
+            description=text,
+            client_request=text,
+        )
+
+    msg_id = await store.add_message("client", "yuko", text, "email", task_id)
+    await store.log_event(
+        "client",
+        "order_queued",
+        task_id,
+        details={"msg_id": msg_id, "preview": text[:120]},
+    )
+    return {
+        "task_id": task_id,
+        "msg_id": msg_id,
+        "status": "queued",
+        "note": "ユウコの応答は /ws/events か /api/tasks/{task_id} で取得してください。",
+    }
 
 
 @app.websocket("/ws/events")

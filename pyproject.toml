@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "itjujiryou"
-version = "0.1.0"
-description = "IT十字陵 — 仮想下請け事務所システム (Phase 1 MVP)"
+version = "0.2.0"
+description = "IT十字陵 — 仮想下請け事務所 (マルチプロセス Claude Code 構成)"
 requires-python = ">=3.11"
 dependencies = [
-    # claude-agent-sdk は常に最新を取りに行く方針（下限のみ指定し、上限は固定しない）
-    # 0.1.76+: effort に "xhigh" が追加された
-    "claude-agent-sdk>=0.1.76",
+    # マルチプロセス構成: ./scripts/start_office.sh で起動した tmux 内の Claude Code
+    # プロセス群が SQLite + stdio MCP server (mcp パッケージ) で連携する。
+    "mcp>=1.0",
     "aiosqlite>=0.20.0",
     "python-dotenv>=1.0.0",
     "fastapi>=0.115",

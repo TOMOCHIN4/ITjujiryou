@@ -1,9 +1,14 @@
-"""IT十字陵 CLI エントリポイント。
+"""IT十字陵 CLI エントリポイント (マルチプロセス構成)。
 
 使い方:
     python -m src.main init                          # DB 初期化
-    python -m src.main cli                           # 対話モードで発注
+    python -m src.main cli                           # 発注を DB に投入する CLI
     python -m src.main serve [--host H] [--port P]   # Web ダッシュボード起動
+
+注: マルチプロセス構成では、エージェントは ./scripts/start_office.sh で起動した
+tmux session 内の Claude Code プロセス群が担う。本 CLI と Web ダッシュボードは
+発注を SQLite に投入するだけで、応答は inbox_watcher 経由で tmux pane のユウコ
+が生成する。
 """
 from __future__ import annotations
 
@@ -25,15 +30,14 @@ async def cmd_init() -> None:
 
 
 async def cmd_cli() -> None:
-    # 起動時に DB を確実に用意
-    await get_store().init()
-    # 遅延 import (claude-agent-sdk が無くても init は通したいため)
-    from src.reception import handle_client_message
+    """発注を queue に投入する CLI (応答は tmux pane / Web ダッシュボード側で観る)。"""
+    store = get_store()
+    await store.init()
 
     print("=" * 60)
-    print("IT十字陵 受付窓口 — 営業主任ユウコがご対応します。")
-    print("発注内容を入力してください。'exit' で終了、'new' で新規案件、")
-    print("空行送信で確定。複数行入力可。")
+    print("IT十字陵 CLI 発注口")
+    print("先に ./scripts/start_office.sh で事務所を起動しておいてください。")
+    print("'exit' で終了。空行送信で確定。複数行入力可。")
     print("=" * 60)
 
     while True:
@@ -58,14 +62,19 @@ async def cmd_cli() -> None:
         if not text:
             continue
 
-        print("\n--- 事務所内タイムライン ---")
-        try:
-            response = await handle_client_message(text)
-        except Exception as e:
-            print(f"\n[エラー] {type(e).__name__}: {e}")
-            continue
-        print("--- /タイムライン ---\n")
-        print(f"[ユウコ]\n{response}\n")
+        title = text.splitlines()[0][:60] or "(無題)"
+        task_id = await store.create_task(
+            title=title, description=text, client_request=text
+        )
+        msg_id = await store.add_message("client", "yuko", text, "email", task_id)
+        await store.log_event(
+            "client",
+            "order_queued",
+            task_id,
+            details={"msg_id": msg_id, "preview": text[:120]},
+        )
+        print(f"[queue] task_id={task_id}  msg_id={msg_id[:8]}")
+        print("ユウコの応答は tmux session 'itj' または http://localhost:8000 で確認してください。")
 
 
 async def cmd_serve(host: str = "127.0.0.1", port: int = 8000) -> None:
