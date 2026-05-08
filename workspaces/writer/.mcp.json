@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "itjujiryou": {
+      "command": "/Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/.venv/bin/python",
+      "args": ["-m", "src.mcp_server"],
+      "cwd": "/Users/tomohiro/Desktop/ClaudeCode/ITjujiryou",
+      "env": {
+        "PYTHONPATH": "/Users/tomohiro/Desktop/ClaudeCode/ITjujiryou"
+      }
+    }
+  }
+}

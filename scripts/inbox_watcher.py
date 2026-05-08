@@ -33,9 +33,9 @@ POLL_INTERVAL = float(os.environ.get("ITJ_WATCHER_POLL_INTERVAL", "1.0"))
 PANE_MAP = {
     "souther": os.environ.get("ITJ_PANE_SOUTHER", "itj:office.0"),
     "yuko": os.environ.get("ITJ_PANE_YUKO", "itj:office.1"),
-    "designer": os.environ.get("ITJ_PANE_DESIGNER", ""),
-    "engineer": os.environ.get("ITJ_PANE_ENGINEER", ""),
-    "writer": os.environ.get("ITJ_PANE_WRITER", ""),
+    "designer": os.environ.get("ITJ_PANE_DESIGNER", "itj:office.2"),
+    "engineer": os.environ.get("ITJ_PANE_ENGINEER", "itj:office.3"),
+    "writer": os.environ.get("ITJ_PANE_WRITER", "itj:office.4"),
 }
 
 
@@ -44,24 +44,24 @@ def _pane_for(agent: str) -> str:
 
 
 def tmux_send(pane: str, text: str) -> None:
-    """pane に文字列を流し込み Enter を打つ。
+    """pane に文字列を流し込み Enter で turn を開始させる。
 
-    long text を一発で送ると tmux の改行解釈で二度送信されることがあるため、
-    `tmux load-buffer + paste-buffer` を使った方が安定。Phase A の prompt 規模
-    (数百〜千文字程度) ではこの方式で問題ない経験則。
+    Claude Code TUI は paste-buffer された複数行を multi-line input として扱うため、
+    1 回の Enter は改行扱いで turn が開始しない。2 回目の Enter で確定する経験則。
     """
     try:
-        # buffer 経由で paste すると改行が保持される
         proc = subprocess.run(
             ["tmux", "load-buffer", "-"], input=text, text=True, check=False
         )
         if proc.returncode != 0:
             return
         subprocess.run(["tmux", "paste-buffer", "-d", "-t", pane], check=False)
-        # Claude Code の prompt 入力を確定するため Enter を送る
+        # 1 つ目の Enter は multi-line 入力の最終行を確定するため
+        subprocess.run(["tmux", "send-keys", "-t", pane, "Enter"], check=False)
+        # 2 つ目の Enter で turn を開始 (Claude Code は空行 Enter で submit)
+        time.sleep(0.15)
         subprocess.run(["tmux", "send-keys", "-t", pane, "Enter"], check=False)
     except FileNotFoundError:
-        # tmux 未起動 / 未インストール
         print("[watcher] tmux command not found", file=sys.stderr)
 
 

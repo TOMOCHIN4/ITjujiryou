@@ -43,21 +43,33 @@ fi
 # claude が exit しても pane が消えないように bash を後追いで残す
 WRAPPED_CLAUDE="$CLAUDE_CMD; echo '[claude exited, press Ctrl-C to leave bash]'; exec bash -i"
 
-# ───────── window: office (3 pane) ─────────
+# ───────── window: office (5 claude pane + monitor) ─────────
 tmux new-session  -d -s "$SESSION" -n office -c "$ROOT/workspaces/souther" \
     "bash -lc \"$WRAPPED_CLAUDE\""
 sleep 0.4
 tmux split-window -t "$SESSION:office"  -h -c "$ROOT/workspaces/yuko" \
     "bash -lc \"$WRAPPED_CLAUDE\""
 sleep 0.4
+tmux split-window -t "$SESSION:office"  -h -c "$ROOT/workspaces/designer" \
+    "bash -lc \"$WRAPPED_CLAUDE\""
+sleep 0.4
+tmux split-window -t "$SESSION:office"  -v -c "$ROOT/workspaces/engineer" \
+    "bash -lc \"$WRAPPED_CLAUDE\""
+sleep 0.4
+tmux split-window -t "$SESSION:office"  -v -c "$ROOT/workspaces/writer" \
+    "bash -lc \"$WRAPPED_CLAUDE\""
+sleep 0.4
 tmux split-window -t "$SESSION:office"  -v -c "$ROOT" \
     "tail -F $ROOT/data/logs/timeline.log"
 
 tmux select-layout -t "$SESSION:office" tiled
-# pane タイトル設定 (tmux >= 2.6)
+# pane タイトル (tmux >= 2.6)
 tmux select-pane -t "$SESSION:office.0" -T "souther"
 tmux select-pane -t "$SESSION:office.1" -T "yuko"
-tmux select-pane -t "$SESSION:office.2" -T "monitor"
+tmux select-pane -t "$SESSION:office.2" -T "designer"
+tmux select-pane -t "$SESSION:office.3" -T "engineer"
+tmux select-pane -t "$SESSION:office.4" -T "writer"
+tmux select-pane -t "$SESSION:office.5" -T "monitor"
 tmux set-option -t "$SESSION:office" pane-border-status top || true
 
 # ───────── window: watcher ─────────
@@ -77,12 +89,14 @@ tmux select-window -t "$SESSION:office"
 cat <<EOM
 [start_office] session '$SESSION' を起動しました。
 
-  - office  pane: 0=souther / 1=yuko / 2=monitor
+  - office  pane: 0=souther / 1=yuko / 2=designer / 3=engineer / 4=writer / 5=monitor
   - watcher ウィンドウ: inbox_watcher.py 常駐
   - api     ウィンドウ: FastAPI ダッシュボード (http://localhost:8000)
 
   attach: tmux attach -t $SESSION
   stop  : $ROOT/scripts/stop_office.sh
+  Haiku  : $ROOT/scripts/use_haiku.sh で 5 人とも Haiku に切替
+  Opus   : $ROOT/scripts/use_opus.sh で本番 Opus に戻す
 EOM
 
 if [ -t 0 ] && [ "${ITJ_AUTOATTACH:-true}" = "true" ]; then

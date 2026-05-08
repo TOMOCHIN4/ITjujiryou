@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "defaultMode": "default",
+    "allow": [
+      "mcp__itjujiryou__send_message",
+      "mcp__itjujiryou__read_status",
+      "mcp__itjujiryou__update_status",
+      "mcp__itjujiryou__consult_peer",
+      "Read",
+      "Write(${CLAUDE_PROJECT_DIR}/../../outputs/**)",
+      "Edit(${CLAUDE_PROJECT_DIR}/../../outputs/**)",
+      "Write(${CLAUDE_PROJECT_DIR}/../../data/memory/designer/**)",
+      "Edit(${CLAUDE_PROJECT_DIR}/../../data/memory/designer/**)",
+      "WebSearch",
+      "WebFetch",
+      "Bash(magick:*)",
+      "Bash(convert:*)",
+      "Bash(ffmpeg:*)",
+      "Bash(ffprobe:*)",
+      "Bash(${CLAUDE_PROJECT_DIR}/../../scripts/gen-asset/**)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(wc:*)",
+      "Bash(file:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git status:*)"
+    ],
+    "deny": [
+      "mcp__itjujiryou__dispatch_task",
+      "mcp__itjujiryou__deliver",
+      "mcp__itjujiryou__evaluate_deliverable",
+      "mcp__itjujiryou__propose_plan",
+      "mcp__itjujiryou__consult_souther",
+      "Bash(rm:*)",
+      "Bash(sudo:*)",
+      "Bash(git push:*)",
+      "Bash(git reset:*)",
+      "Bash(git rebase:*)",
+      "Bash(curl:*)",
+      "Bash(wget:*)"
+    ]
+  },
+  "model": "claude-opus-4-7"
+}

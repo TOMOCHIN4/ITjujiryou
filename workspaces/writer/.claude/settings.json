@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "defaultMode": "default",
+    "allow": [
+      "mcp__itjujiryou__send_message",
+      "mcp__itjujiryou__read_status",
+      "mcp__itjujiryou__update_status",
+      "mcp__itjujiryou__consult_peer",
+      "Read",
+      "Write(${CLAUDE_PROJECT_DIR}/../../outputs/**)",
+      "Edit(${CLAUDE_PROJECT_DIR}/../../outputs/**)",
+      "Write(${CLAUDE_PROJECT_DIR}/../../data/memory/writer/**)",
+      "Edit(${CLAUDE_PROJECT_DIR}/../../data/memory/writer/**)",
+      "WebSearch",
+      "WebFetch"
+    ],
+    "deny": [
+      "mcp__itjujiryou__dispatch_task",
+      "mcp__itjujiryou__deliver",
+      "mcp__itjujiryou__evaluate_deliverable",
+      "mcp__itjujiryou__propose_plan",
+      "mcp__itjujiryou__consult_souther",
+      "Bash"
+    ]
+  },
+  "model": "claude-opus-4-7"
+}
