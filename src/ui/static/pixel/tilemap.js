@@ -85,13 +85,12 @@ export const DECOR_PLACEMENT = {
 
 // デスクの配置情報。各キャラの home_tile を中心に w*h タイル分のスペースに展開。
 // y_offset = キャラ足元から何 px 上にデスク中心を置くか (下半身を隠す効果)。
-// v4.2: デスクは再設計のため一旦すべて非表示。再開時の参照として旧配置値はコメントで残す。
-//   souther:  { cx: 7.5, cy: 2.8, w: 3, h: 1, y_offset: 18 },
-//   yuko:     { cx: 7.5, cy: 5.5, w: 3, h: 2, y_offset: 0  },
-//   writer:   { cx: 3,   cy: 8.5, w: 2, h: 1, y_offset: 18 },
-//   designer: { cx: 7.5, cy: 8.5, w: 2, h: 1, y_offset: 18 },
-//   engineer: { cx: 12,  cy: 8.5, w: 2, h: 1, y_offset: 18 },
-export const DESK_PLACEMENT = {};
+// v4.2 デスク再設計: 我々から見ると裏面 (化粧板側)、キャラ側が正面 (knee well)。
+//   souther: 1×3 → 2×6 へ拡張、化粧板 + ワイングラスのみの豪華 CEO デスク (背面ビュー)。
+// その他 4 デスクは旧アセットの 3:1 構図のまま再配置を保留。
+export const DESK_PLACEMENT = {
+  souther: { cx: 7.5, cy: 2.8, w: 6, h: 2, y_offset: 0 },
+};
 
 // 座標変換
 export const tileToPx = (tx) => tx * TILE_SIZE;
