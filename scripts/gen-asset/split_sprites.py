@@ -23,6 +23,7 @@ from postprocess import (
     chroma_key_to_alpha,
     parse_chroma_color,
     find_main_character_bbox,
+    detect_blobs_whole_image,
 )
 
 
@@ -62,6 +63,12 @@ def parse_args():
                         "--chroma-key と併用前提。")
     p.add_argument("--smart-crop-padding", type=int, default=8,
                    help="--smart-crop bbox の四辺に追加する余白 px (resize 前)。既定 8。")
+    p.add_argument("--auto-detect", action="store_true",
+                   help="grid 等分割を無視し、画像全体の chroma-key 後 blob を自動検出して "
+                        "上位 (cols×rows) 個を bbox 抽出する。Gemini が grid を不均等に描いたり "
+                        "1 セルに 2 体並べたりした場合に有効。--chroma-key 必須。")
+    p.add_argument("--auto-detect-min-area", type=float, default=0.001,
+                   help="--auto-detect で blob の最小面積比 (画像全体に対する)。既定 0.001。")
     return p.parse_args()
 
 
@@ -121,15 +128,40 @@ def main():
     img = trim_watermark(img, args.trim_watermark, args.watermark_ratio)
     sys.stderr.write(f"==> trim -> {img.size[0]}x{img.size[1]}\n")
 
-    cells = split_cells(img, cols, rows, args.cell_margin)
-    sys.stderr.write(f"==> split {cols}x{rows} = {len(cells)} cells\n")
-
     # クロマキー設定 (任意)
     chroma_rgb = parse_chroma_color(args.chroma_key) if args.chroma_key else None
     if chroma_rgb is not None:
         sys.stderr.write(
             f"==> chroma-key {chroma_rgb} (tolerance {args.chroma_tolerance}) — alpha 抽出有効\n"
         )
+
+    if args.auto_detect:
+        if chroma_rgb is None:
+            sys.stderr.write("✗ --auto-detect は --chroma-key が必須\n")
+            sys.exit(1)
+        bboxes = detect_blobs_whole_image(
+            img, chroma_rgb, args.chroma_tolerance,
+            min_area_ratio=args.auto_detect_min_area,
+            max_blobs=total,
+        )
+        sys.stderr.write(
+            f"==> auto-detect: found {len(bboxes)} blobs (expected {total})\n"
+        )
+        cells = []
+        pad = args.smart_crop_padding
+        for (l, t, r, b) in bboxes:
+            l = max(0, l - pad)
+            t = max(0, t - pad)
+            r = min(img.size[0], r + pad)
+            b = min(img.size[1], b + pad)
+            cells.append(img.crop((l, t, r, b)))
+        # 不足分は緑空セルで埋める (名前との一致を保つため)
+        while len(cells) < total:
+            cells.append(Image.new("RGB", (img.size[0] // cols, img.size[1] // rows),
+                                    color=chroma_rgb))
+    else:
+        cells = split_cells(img, cols, rows, args.cell_margin)
+        sys.stderr.write(f"==> split {cols}x{rows} = {len(cells)} cells\n")
 
     pack_contents = {"info": {"author": "xcode", "version": 1}, "properties": {"provides-namespace": True}}
     (pack_dir / "Contents.json").write_text(json.dumps(pack_contents, indent=2), encoding="utf-8")

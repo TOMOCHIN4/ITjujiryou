@@ -1,105 +1,80 @@
-// PixiJS シーン構築。事務所俯瞰ビュー (床 / 家具 / キャラ / 吹き出し)。
-// PixiJS v8 を CDN グローバル PIXI として使う。
-// Phase 2: キャラは textures (sprite sheet) があれば AnimatedSprite、なければ Graphics 矩形にフォールバック。
+// Phase 3.0 NES topdown シーン構築。
+// PixiJS v8 グローバル PIXI を CDN から使用。tilemap.js のマップを走査してタイル + キャラ + 吹き出しを配置。
+// stage.scale.set(1.5) で論理 512x384 を 768x576 表示、canvas 800x600 内にレターボックス中央配置。
 
-import { CHAR_DEFS, CANVAS_W, CANVAS_H, buildCharacter, isStaff } from "/pixel-static/characters.js";
+import { CHAR_DEFS, buildCharacter, isStaff, CANVAS_W, CANVAS_H } from "/pixel-static/characters.js";
 import { spawnBubble } from "/pixel-static/speech.js";
+import {
+  TILE_SIZE, MAP_COLS, MAP_ROWS, MAP, tileAt, TILE_NAME, TILE,
+  STAGE_SCALE, STAGE_OFFSET_X, STAGE_OFFSET_Y, tileToPx, tileToPy,
+} from "/pixel-static/tilemap.js";
 
-export async function createScene(rootEl, { onCharClick, textures = null, sazanTextures = null }) {
+export async function createScene(rootEl, { onCharClick, charTextures = null, tileTextures = null }) {
   const app = new PIXI.Application();
   await app.init({
     width: CANVAS_W,
     height: CANVAS_H,
-    background: 0x2a2438,
+    background: 0x000000,
     antialias: false,
+    roundPixels: true,
   });
   rootEl.appendChild(app.canvas);
 
   const stage = app.stage;
   stage.sortableChildren = true;
+  stage.x = STAGE_OFFSET_X;
+  stage.y = STAGE_OFFSET_Y;
+  stage.scale.set(STAGE_SCALE);
 
-  // ───────── floorLayer (チェッカー床) ─────────
+  // ───────── floorLayer (床のみ全面に敷く) ─────────
   const floor = new PIXI.Container();
   floor.zIndex = 0;
-  const tile = 16;
-  const cols = Math.ceil(CANVAS_W / tile);
-  const rows = Math.ceil(CANVAS_H / tile);
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const dark = (r + c) % 2 === 0;
-      floor.addChild(
-        new PIXI.Graphics()
-          .rect(c * tile, r * tile, tile, tile)
-          .fill(dark ? 0x252033 : 0x2c263d)
-      );
+  for (let ty = 0; ty < MAP_ROWS; ty++) {
+    for (let tx = 0; tx < MAP_COLS; tx++) {
+      // 全タイルに floor_carpet_a を敷いておく (家具下も床抜けしないように)
+      const tex = tileTextures?.floor_carpet_a;
+      if (tex) {
+        const s = new PIXI.Sprite(tex);
+        s.x = tileToPx(tx);
+        s.y = tileToPy(ty);
+        s.width = TILE_SIZE;
+        s.height = TILE_SIZE;
+        floor.addChild(s);
+      } else {
+        // フォールバック: 暗紫タイル
+        const dark = (tx + ty) % 2 === 0;
+        floor.addChild(
+          new PIXI.Graphics()
+            .rect(tileToPx(tx), tileToPy(ty), TILE_SIZE, TILE_SIZE)
+            .fill(dark ? 0x252033 : 0x2c263d)
+        );
+      }
     }
   }
   stage.addChild(floor);
 
-  // ───────── furnitureLayer ─────────
+  // ───────── furnitureLayer (壁・玉座・机・受付・植物・書類・赤絨毯) ─────────
   const furniture = new PIXI.Container();
   furniture.zIndex = 10;
+  furniture.sortableChildren = true;
 
-  // 玉座 (サザンの後ろ)
-  furniture.addChild(
-    new PIXI.Graphics()
-      .roundRect(CHAR_DEFS.souther.x - 48, CHAR_DEFS.souther.y - 70, 96, 60, 8)
-      .fill({ color: 0x4a3a6e, alpha: 0.85 })
-      .stroke({ color: 0xb18cff, width: 2, alpha: 0.7 })
-  );
-
-  // 机 (各部下の前 = 下方向)
-  ["yuko", "designer", "engineer", "writer"].forEach((id) => {
-    const def = CHAR_DEFS[id];
-    furniture.addChild(
-      new PIXI.Graphics()
-        .roundRect(def.x - 42, def.y + 36, 84, 16, 3)
-        .fill({ color: 0x3a3450 })
-        .stroke({ color: 0x55456a, width: 1 })
-    );
-  });
-
-  // 部屋の壁
-  furniture.addChild(
-    new PIXI.Graphics()
-      .roundRect(20, 30, CANVAS_W - 40, CANVAS_H - 50, 8)
-      .stroke({ color: 0x55456a, width: 2 })
-  );
-
-  // 玄関ラベル
-  const door = new PIXI.Graphics()
-    .roundRect(30, CANVAS_H - 60, 60, 28, 4)
-    .fill({ color: 0x1a1525 })
-    .stroke({ color: 0x6e5d8a, width: 1 });
-  furniture.addChild(door);
-  const doorLabel = new PIXI.Text({
-    text: "🚪 受付",
-    style: {
-      fontFamily: '-apple-system, "Hiragino Sans", "Yu Gothic", sans-serif',
-      fontSize: 11,
-      fill: 0xa09cc0,
-    },
-  });
-  doorLabel.anchor.set(0, 0.5);
-  doorLabel.x = 36;
-  doorLabel.y = CANVAS_H - 46;
-  furniture.addChild(doorLabel);
-
-  // タイトル
-  const title = new PIXI.Text({
-    text: "愛帝十字陵 — 7F オフィス",
-    style: {
-      fontFamily: '-apple-system, "Hiragino Sans", "Yu Gothic", sans-serif',
-      fontSize: 12,
-      fill: 0x8a82a8,
-      letterSpacing: 1,
-    },
-  });
-  title.anchor.set(0.5, 0);
-  title.x = CANVAS_W / 2;
-  title.y = 8;
-  furniture.addChild(title);
-
+  for (let ty = 0; ty < MAP_ROWS; ty++) {
+    for (let tx = 0; tx < MAP_COLS; tx++) {
+      const id = tileAt(tx, ty);
+      if (id === TILE.FLOOR_A || id === TILE.FLOOR_B || id === TILE.EMPTY) continue;
+      const name = TILE_NAME[id];
+      const tex = tileTextures?.[name];
+      if (!tex) continue;
+      const s = new PIXI.Sprite(tex);
+      s.x = tileToPx(tx);
+      s.y = tileToPy(ty);
+      s.width = TILE_SIZE;
+      s.height = TILE_SIZE;
+      // y-sort: 家具とキャラを y で重ね合わせ。家具は base 10 + y/16 (キャラ 20 + y より下になる)
+      s.zIndex = 10 + s.y;
+      furniture.addChild(s);
+    }
+  }
   stage.addChild(furniture);
 
   // ───────── characterLayer ─────────
@@ -108,9 +83,8 @@ export async function createScene(rootEl, { onCharClick, textures = null, sazanT
   charLayer.sortableChildren = true;
   const charactersById = {};
   for (const [agent, def] of Object.entries(CHAR_DEFS)) {
-    // サザンは Phase 2.5 の 36 ポーズ専用シート、他は Phase 2 の 4 ポーズシート
-    const ag = agent === "souther" ? sazanTextures : (textures?.[agent] || null);
-    const c = buildCharacter(agent, def, onCharClick, ag);
+    const tex = charTextures?.[agent] || null;
+    const c = buildCharacter(agent, def, onCharClick, tex);
     charLayer.addChild(c);
     charactersById[agent] = c;
   }
@@ -128,10 +102,9 @@ export async function createScene(rootEl, { onCharClick, textures = null, sazanT
   function bubble(agent, text, ttlMs = 3000) {
     if (!isStaff(agent)) return;
     const c = charactersById[agent];
-    const def = CHAR_DEFS[agent];
-    // 初期位置はキャラの現在座標 (歩行中なら walking 中の位置)
-    const initialPos = c ? { x: c.x, y: c.y } : def;
-    const getPos = c ? () => ({ x: c.x, y: c.y }) : null;
+    if (!c) return;
+    const initialPos = { x: c.x, y: c.y };
+    const getPos = () => ({ x: c.x, y: c.y });
     spawnBubble(overlay, initialPos, text, ttlMs, bubbleStacks, agent, getPos);
   }
 

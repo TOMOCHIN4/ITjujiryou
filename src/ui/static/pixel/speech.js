@@ -3,7 +3,7 @@
 // 滞在: 0.4s 目に小さな yoyo jitter (rotation ±1.5°)
 // 退場: scale → 0.85, alpha → 0 with power2.in
 
-import { gsap } from "/pixel-static/animation.js";
+import gsap from "https://cdn.jsdelivr.net/npm/gsap@3.12.5/+esm";
 
 const PADDING_X = 8;
 const PADDING_Y = 5;

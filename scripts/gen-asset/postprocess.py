@@ -108,6 +108,87 @@ def find_main_character_bbox(img, target_rgb, tolerance: int = 80, min_area_rati
     return (int(xs.min()), int(ys.min()), int(xs.max() + 1), int(ys.max() + 1))
 
 
+def detect_blobs_whole_image(img, target_rgb, tolerance: int = 80,
+                              min_area_ratio: float = 0.001, max_blobs: int = None):
+    """画像全体から target 色から離れた **独立 blob** を抽出して bbox リストを返す。
+
+    grid 線の位置や Gemini の不均等な配置に影響されず、緑背景に浮かぶキャラ群を
+    自動的に分離する。1xN の横並び strip でも NxM grid でも、blob は (y_row, x) でソートして
+    走査順 (上→下、左→右) を再現する。
+
+    Returns:
+        list of (left, top, right, bottom)。max_blobs 指定時は面積上位 N 個に絞る。
+    """
+    try:
+        import numpy as np
+        from scipy.ndimage import label
+    except ImportError:
+        return []
+
+    rgb = img.convert("RGB")
+    arr = np.asarray(rgb)
+    H, W = arr.shape[:2]
+    tr, tg, tb = target_rgb
+    is_target = (
+        (np.abs(arr[:, :, 0].astype(int) - tr) <= tolerance)
+        & (np.abs(arr[:, :, 1].astype(int) - tg) <= tolerance)
+        & (np.abs(arr[:, :, 2].astype(int) - tb) <= tolerance)
+    )
+    not_target = ~is_target
+    if not not_target.any():
+        return []
+
+    labels, n = label(not_target)
+    if n == 0:
+        return []
+
+    sizes = np.bincount(labels.ravel())
+    sizes[0] = 0
+    min_area = max(1, int(W * H * min_area_ratio))
+
+    cands = []
+    for label_id in range(1, n + 1):
+        if sizes[label_id] < min_area:
+            continue
+        ys, xs = np.where(labels == label_id)
+        cands.append((
+            int(sizes[label_id]),
+            int(xs.min()), int(ys.min()), int(xs.max() + 1), int(ys.max() + 1),
+        ))
+
+    if not cands:
+        return []
+
+    # 面積で sort (上位 N 個に絞る前のフィルタ)
+    cands.sort(key=lambda c: c[0], reverse=True)
+    if max_blobs is not None:
+        cands = cands[:max_blobs]
+
+    # 走査順ソート: y 中心で行を判定 (典型的な行高さ = H / 行数)、その後 x
+    # 1×N strip なら全部同じ行になり、x のみが効く
+    # 行クラスタリング: y_center が近い (40px 以内 = キャラ高さの 1/3 程度) ものを同じ行に
+    rows = []
+    cands_sorted_by_y = sorted(cands, key=lambda c: (c[2] + c[4]) / 2)
+    row_threshold = H * 0.15  # キャラ高さの大体 1/3
+    for c in cands_sorted_by_y:
+        y_center = (c[2] + c[4]) / 2
+        placed = False
+        for row in rows:
+            row_center = sum((rc[2] + rc[4]) / 2 for rc in row) / len(row)
+            if abs(y_center - row_center) < row_threshold:
+                row.append(c)
+                placed = True
+                break
+        if not placed:
+            rows.append([c])
+    # 各行を x で sort
+    for row in rows:
+        row.sort(key=lambda c: c[1])
+    flat = [c for row in rows for c in row]
+
+    return [(c[1], c[2], c[3], c[4]) for c in flat]
+
+
 def chroma_key_to_alpha(img, target_rgb, tolerance: int = 40):
     """指定 RGB に近い pixel を alpha=0 に置換した RGBA Image を返す (PIL ネイティブ高速版)。
 

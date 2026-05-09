@@ -4,8 +4,8 @@
 import { createScene } from "/pixel-static/scene.js";
 import { dispatch } from "/pixel-static/eventMap.js";
 import { CHAR_DEFS } from "/pixel-static/characters.js";
-import { loadStaffTextures, loadSazanTextures } from "/pixel-static/spriteLoader.js";
-import { makeAnimator } from "/pixel-static/animation.js";
+import { loadCharSheet, loadTileset } from "/pixel-static/spriteLoader.js";
+import { makeMovement } from "/pixel-static/movement.js";
 
 // ---- DOM 参照 ----
 const $ = (sel) => document.querySelector(sel);
@@ -22,17 +22,17 @@ const latestEvent = $("#latest-event");
 const recentMessages = $("#recent-messages");
 
 // ---- スプライト読み込み + シーン構築 ----
-const [textures, sazanTextures] = await Promise.all([
-  loadStaffTextures(),     // 4 キャラ × 4 ポーズ (Phase 2)
-  loadSazanTextures(),     // サザン 36 ポーズ (Phase 2.5)
+const [charTextures, tileTextures] = await Promise.all([
+  loadCharSheet(),    // 5 キャラ × 4方向 × 2フレーム = 40 frame (Phase 3.0)
+  loadTileset(),      // 床 / 壁 / 玉座 / 4机 / 受付 / 植物 / 書類 / ドア / 赤絨毯 = 16 tile (Phase 3.0)
 ]);
 const scene = await createScene($("#pixi-root"), {
   onCharClick: openPanel,
-  textures,
-  sazanTextures,
+  charTextures,
+  tileTextures,
 });
-const animator = makeAnimator(scene.charactersById);
-window.__pixelDebug = { scene, animator };  // デバッグコンソールから操作するためのフック
+const movement = makeMovement(scene.charactersById);
+window.__pixelDebug = { scene, movement };  // デバッグコンソールから操作するためのフック
 
 // ---- WebSocket ----
 // 接続直後はサーバが過去 100 件のスナップショットを一気に送ってくる。
@@ -70,7 +70,7 @@ function connectWs() {
     // スナップショット期間中は描画を抑止 (state 切替も歩行も止める)
     if (Date.now() < snapshotEnd) return;
 
-    dispatch(data, scene, animator);
+    dispatch(data, scene, movement);
   });
 }
 connectWs();
