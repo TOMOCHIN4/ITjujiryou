@@ -5,7 +5,7 @@
 import { CHAR_DEFS, CANVAS_W, CANVAS_H, buildCharacter, isStaff } from "/pixel-static/characters.js";
 import { spawnBubble } from "/pixel-static/speech.js";
 
-export async function createScene(rootEl, { onCharClick, textures = null }) {
+export async function createScene(rootEl, { onCharClick, textures = null, sazanTextures = null }) {
   const app = new PIXI.Application();
   await app.init({
     width: CANVAS_W,
@@ -108,7 +108,9 @@ export async function createScene(rootEl, { onCharClick, textures = null }) {
   charLayer.sortableChildren = true;
   const charactersById = {};
   for (const [agent, def] of Object.entries(CHAR_DEFS)) {
-    const c = buildCharacter(agent, def, onCharClick, textures);
+    // サザンは Phase 2.5 の 36 ポーズ専用シート、他は Phase 2 の 4 ポーズシート
+    const ag = agent === "souther" ? sazanTextures : (textures?.[agent] || null);
+    const c = buildCharacter(agent, def, onCharClick, ag);
     charLayer.addChild(c);
     charactersById[agent] = c;
   }

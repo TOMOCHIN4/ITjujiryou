@@ -7,10 +7,29 @@ function preview(s) {
   return String(s).replace(/\s+/g, " ").trim();
 }
 
+// サザンの口調から推測してポーズを返す。マッチしない場合は null (= 通常 talking)。
+function inferSazanPose(text) {
+  if (!text) return null;
+  const s = String(text);
+  if (/[ふフ]ハハ|高笑/.test(s)) return "fuhahaha_laughing";
+  if (/許す|よかろう|認め[るた]/.test(s)) return "nod_approve";
+  if (/ならぬ|却下|許さ[ぬん]/.test(s)) return "hand_stop";
+  if (/愛|温もり|お師さん/.test(s)) return "thinking_hand_chin";
+  if (/負け|及ば[ぬん]|フッ、フフ/.test(s)) return "accept_defeat";
+  if (/ひかぬ|媚びぬ|省みぬ|帝王/.test(s)) return "fist_raised";
+  if (/制圧前進|滅びよ/.test(s)) return "proclaim_arms_wide";
+  return null;
+}
+
 export const EVENT_HANDLERS = {
-  message: (ev, scene) => {
+  message: (ev, scene, animator) => {
     const text = preview(ev.details?.message || ev.details?.preview || "💬");
     scene.bubble(ev.agent, text || "💬", 3500);
+    // サザンが話す時は内容に応じたポーズを取らせる (3 秒 → idle)
+    if (ev.agent === "souther" && animator) {
+      const pose = inferSazanPose(text) || "talking";
+      animator.strikePose("souther", pose, 3000);
+    }
   },
 
   consult: (ev, scene, animator) => {
@@ -19,6 +38,10 @@ export const EVENT_HANDLERS = {
       animator?.visitDesk(ev.agent, target, 1500);
     }
     scene.bubble(ev.agent, "💬 相談中…", 2500);
+    // サザンが相談を受ける側 (consult_souther) なら思索ポーズ
+    if (target === "souther" && animator) {
+      animator.strikePose("souther", "thinking_hand_chin", 4000);
+    }
   },
 
   dispatch: (ev, scene, animator) => {
@@ -45,6 +68,15 @@ export const EVENT_HANDLERS = {
       : "🔍 評価";
     scene.bubble(ev.agent, tag, 2500);
 
+    // サザンが裁定する場合は専用ポーズ
+    if (ev.agent === "souther" && animator) {
+      const pose = v === "approve"   ? "nod_approve"
+                 : v === "revise"    ? "hand_stop"
+                 : v === "escalate_to_president" ? "fist_raised"
+                 :                      "point_decree_right";
+      animator.strikePose("souther", pose, 2500);
+    }
+
     // 対象の机方向へ短い visit (target_agent or target_subtask の assignee)
     const target = ev.details?.target_agent;
     if (target && target !== ev.agent) {
@@ -52,8 +84,12 @@ export const EVENT_HANDLERS = {
     }
   },
 
-  delivery: (ev, scene) => {
+  delivery: (ev, scene, animator) => {
     scene.bubble(ev.agent, "📦 納品！", 4000);
+    // サザンが納品報告を受けたら高笑い
+    if (ev.agent === "souther" && animator) {
+      animator.strikePose("souther", "fuhahaha_laughing", 3000);
+    }
   },
 
   // 部下完了報告 — Phase 1 では未知扱いだったが Phase 2 で正式採用

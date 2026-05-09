@@ -20,6 +20,9 @@ from postprocess import (
     resize_long_edge,
     save_under_limit,
     write_imageset_metadata,
+    chroma_key_to_alpha,
+    parse_chroma_color,
+    find_main_character_bbox,
 )
 
 
@@ -47,6 +50,18 @@ def parse_args():
                    help="Asset Catalog 内のパックディレクトリ。例 .../Assets.xcassets/Heroes/")
     p.add_argument("--cell-margin", type=float, default=0.0,
                    help="セルの内側マージン比率（枠線除去用）。既定 0。")
+    p.add_argument("--chroma-key", default=None,
+                   help="クロマキーする色 (例: '00ff00' / '#00FF00' / '0,255,0')。"
+                        "セル分割後・リサイズ前に適用し、target に近い pixel を alpha=0 化。"
+                        "未指定なら適用しない (後方互換)。")
+    p.add_argument("--chroma-tolerance", type=int, default=40,
+                   help="クロマキーの許容差 (RGB 各成分)。既定 40。")
+    p.add_argument("--smart-crop", action="store_true",
+                   help="セル内で chroma-key 色から離れた最大連結成分を見つけて、その bbox + パディングで"
+                        "再クロップする。Gemini のグリッド枠線や隣接セル侵入を排除できる。"
+                        "--chroma-key と併用前提。")
+    p.add_argument("--smart-crop-padding", type=int, default=8,
+                   help="--smart-crop bbox の四辺に追加する余白 px (resize 前)。既定 8。")
     return p.parse_args()
 
 
@@ -109,6 +124,13 @@ def main():
     cells = split_cells(img, cols, rows, args.cell_margin)
     sys.stderr.write(f"==> split {cols}x{rows} = {len(cells)} cells\n")
 
+    # クロマキー設定 (任意)
+    chroma_rgb = parse_chroma_color(args.chroma_key) if args.chroma_key else None
+    if chroma_rgb is not None:
+        sys.stderr.write(
+            f"==> chroma-key {chroma_rgb} (tolerance {args.chroma_tolerance}) — alpha 抽出有効\n"
+        )
+
     pack_contents = {"info": {"author": "xcode", "version": 1}, "properties": {"provides-namespace": True}}
     (pack_dir / "Contents.json").write_text(json.dumps(pack_contents, indent=2), encoding="utf-8")
 
@@ -121,7 +143,25 @@ def main():
         imageset_dir.mkdir(parents=True, exist_ok=True)
         out_path = imageset_dir / f"{name}.png"
 
-        cell_resized = resize_long_edge(cell, args.cell_size)
+        # smart-crop: 最大連結成分の bbox に絞り込む (Gemini のグリッド/隣接侵入対策)
+        if args.smart_crop and chroma_rgb is not None:
+            bbox = find_main_character_bbox(cell, chroma_rgb, args.chroma_tolerance)
+            if bbox is not None:
+                pad = args.smart_crop_padding
+                w, h = cell.size
+                left = max(0, bbox[0] - pad)
+                top = max(0, bbox[1] - pad)
+                right = min(w, bbox[2] + pad)
+                bottom = min(h, bbox[3] + pad)
+                cell = cell.crop((left, top, right, bottom))
+
+        # chroma-key は smart-crop 後 / resize 前に適用 (端の anti-alias を保つ)
+        cell_alpha = (
+            chroma_key_to_alpha(cell, chroma_rgb, args.chroma_tolerance)
+            if chroma_rgb is not None
+            else cell
+        )
+        cell_resized = resize_long_edge(cell_alpha, args.cell_size)
         size_bytes = save_under_limit(cell_resized, out_path, args.max_bytes)
         write_imageset_metadata(out_path)
 

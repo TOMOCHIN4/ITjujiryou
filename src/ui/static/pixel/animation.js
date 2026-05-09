@@ -73,6 +73,18 @@ export function makeAnimator(charactersById) {
     setPose(agent, pose);
   }
 
+  /**
+   * 一時ポーズ: 指定 pose に切替 → dwellMs 待つ → idle に戻る。
+   * サザンの decree / 慟哭 / 高笑い 等の演出に使う。
+   */
+  function strikePose(agent, pose, dwellMs = 2000) {
+    setPose(agent, pose);
+    return gsap.to({}, {
+      duration: dwellMs / 1000,
+      onComplete: () => setPose(agent, "idle"),
+    });
+  }
+
   /** デバッグ用: 全停止して home へワープ */
   function stopAll() {
     for (const tl of activeTimelines.values()) tl.kill();
@@ -85,5 +97,5 @@ export function makeAnimator(charactersById) {
     }
   }
 
-  return { walkTo, visitDesk, settleAt, stopAll, homePos };
+  return { walkTo, visitDesk, settleAt, strikePose, stopAll, homePos };
 }

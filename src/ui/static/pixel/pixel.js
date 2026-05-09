@@ -4,7 +4,7 @@
 import { createScene } from "/pixel-static/scene.js";
 import { dispatch } from "/pixel-static/eventMap.js";
 import { CHAR_DEFS } from "/pixel-static/characters.js";
-import { loadStaffTextures } from "/pixel-static/spriteLoader.js";
+import { loadStaffTextures, loadSazanTextures } from "/pixel-static/spriteLoader.js";
 import { makeAnimator } from "/pixel-static/animation.js";
 
 // ---- DOM 参照 ----
@@ -22,10 +22,14 @@ const latestEvent = $("#latest-event");
 const recentMessages = $("#recent-messages");
 
 // ---- スプライト読み込み + シーン構築 ----
-const textures = await loadStaffTextures();   // 失敗時は null → Phase 1 フォールバック
+const [textures, sazanTextures] = await Promise.all([
+  loadStaffTextures(),     // 4 キャラ × 4 ポーズ (Phase 2)
+  loadSazanTextures(),     // サザン 36 ポーズ (Phase 2.5)
+]);
 const scene = await createScene($("#pixi-root"), {
   onCharClick: openPanel,
   textures,
+  sazanTextures,
 });
 const animator = makeAnimator(scene.charactersById);
 window.__pixelDebug = { scene, animator };  // デバッグコンソールから操作するためのフック
