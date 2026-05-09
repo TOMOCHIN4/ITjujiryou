@@ -56,4 +56,38 @@ export async function loadTileset(baseUrl = "/pixel-static/sprites/tiles") {
   }
 }
 
+export async function loadBackground(url = "/pixel-static/sprites/background/office.png") {
+  try {
+    return await loadOne(url);
+  } catch (err) {
+    console.warn("[pixel] background load failed:", err);
+    return null;
+  }
+}
+
+export async function loadDecor(baseUrl = "/pixel-static/sprites/decor") {
+  try {
+    return {
+      motto_plaque: await loadOne(`${baseUrl}/motto_plaque.png`),
+    };
+  } catch (err) {
+    console.warn("[pixel] decor load failed:", err);
+    return null;
+  }
+}
+
+export async function loadDesks(baseUrl = "/pixel-static/sprites/furniture") {
+  try {
+    const out = {};
+    const tasks = AGENTS.map(async (agent) => {
+      out[agent] = await loadOne(`${baseUrl}/desk_${agent}.png`);
+    });
+    await Promise.all(tasks);
+    return out;
+  } catch (err) {
+    console.warn("[pixel] desks load failed:", err);
+    return null;
+  }
+}
+
 export { AGENTS, FACING_ABBR, TILE_NAMES };

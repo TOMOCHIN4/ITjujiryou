@@ -6,10 +6,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.memory.store import get_store
 from src.ui.broker import broker
@@ -24,6 +25,23 @@ WORKING_WINDOW_SEC = 30  # 直近イベントから何秒以内なら working �
 
 
 app = FastAPI(title="愛帝十字陵 Dashboard", version="0.3.0")
+
+
+class NoCacheStaticMiddleware(BaseHTTPMiddleware):
+    """開発時に /pixel-static, /static, /outputs のブラウザキャッシュを無効化。
+    ES module / 画像を編集→リロードで即反映するため。"""
+
+    async def dispatch(self, request: Request, call_next):
+        resp = await call_next(request)
+        path = request.url.path
+        if path.startswith(("/pixel-static", "/static", "/outputs")):
+            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            resp.headers["Pragma"] = "no-cache"
+            resp.headers["Expires"] = "0"
+        return resp
+
+
+app.add_middleware(NoCacheStaticMiddleware)
 
 
 @app.get("/")

@@ -7,9 +7,10 @@ import { spawnBubble } from "/pixel-static/speech.js";
 import {
   TILE_SIZE, MAP_COLS, MAP_ROWS, MAP, tileAt, TILE_NAME, TILE,
   STAGE_SCALE, STAGE_OFFSET_X, STAGE_OFFSET_Y, tileToPx, tileToPy,
+  DESK_PLACEMENT, DECOR_PLACEMENT,
 } from "/pixel-static/tilemap.js";
 
-export async function createScene(rootEl, { onCharClick, charTextures = null, tileTextures = null }) {
+export async function createScene(rootEl, { onCharClick, charTextures = null, tileTextures = null, deskTextures = null, backgroundTexture = null, decorTextures = null }) {
   const app = new PIXI.Application();
   await app.init({
     width: CANVAS_W,
@@ -26,22 +27,20 @@ export async function createScene(rootEl, { onCharClick, charTextures = null, ti
   stage.y = STAGE_OFFSET_Y;
   stage.scale.set(STAGE_SCALE);
 
-  // ───────── floorLayer (床のみ全面に敷く) ─────────
+  // ───────── backgroundLayer (オフィス全体を 1 枚絵で敷く) ─────────
   const floor = new PIXI.Container();
   floor.zIndex = 0;
-  for (let ty = 0; ty < MAP_ROWS; ty++) {
-    for (let tx = 0; tx < MAP_COLS; tx++) {
-      // 全タイルに floor_carpet_a を敷いておく (家具下も床抜けしないように)
-      const tex = tileTextures?.floor_carpet_a;
-      if (tex) {
-        const s = new PIXI.Sprite(tex);
-        s.x = tileToPx(tx);
-        s.y = tileToPy(ty);
-        s.width = TILE_SIZE;
-        s.height = TILE_SIZE;
-        floor.addChild(s);
-      } else {
-        // フォールバック: 暗紫タイル
+  if (backgroundTexture) {
+    const bg = new PIXI.Sprite(backgroundTexture);
+    bg.x = 0;
+    bg.y = 0;
+    bg.width = MAP_COLS * TILE_SIZE;
+    bg.height = MAP_ROWS * TILE_SIZE;
+    floor.addChild(bg);
+  } else {
+    // フォールバック: 暗紫タイル (背景画像読み込み失敗時)
+    for (let ty = 0; ty < MAP_ROWS; ty++) {
+      for (let tx = 0; tx < MAP_COLS; tx++) {
         const dark = (tx + ty) % 2 === 0;
         floor.addChild(
           new PIXI.Graphics()
@@ -77,6 +76,22 @@ export async function createScene(rootEl, { onCharClick, charTextures = null, ti
   }
   stage.addChild(furniture);
 
+  // ───────── decorLayer (壁装飾: 社訓額縁など) ─────────
+  const decor = new PIXI.Container();
+  decor.zIndex = 5;  // 背景 (0) より上、キャラ (20+) より下
+  for (const [name, place] of Object.entries(DECOR_PLACEMENT)) {
+    const tex = decorTextures?.[name];
+    if (!tex) continue;
+    const s = new PIXI.Sprite(tex);
+    s.anchor.set(0.5, 0.5);
+    s.x = place.cx * TILE_SIZE + TILE_SIZE / 2;
+    s.y = place.cy * TILE_SIZE + TILE_SIZE / 2;
+    s.width = place.w * TILE_SIZE;
+    s.height = place.h * TILE_SIZE;
+    decor.addChild(s);
+  }
+  stage.addChild(decor);
+
   // ───────── characterLayer ─────────
   const charLayer = new PIXI.Container();
   charLayer.zIndex = 20;
@@ -87,6 +102,21 @@ export async function createScene(rootEl, { onCharClick, charTextures = null, ti
     const c = buildCharacter(agent, def, onCharClick, tex);
     charLayer.addChild(c);
     charactersById[agent] = c;
+  }
+  // デスクをキャラより前面に配置 (下半身が隠れて「座っている」演出)
+  for (const [agent, place] of Object.entries(DESK_PLACEMENT)) {
+    const tex = deskTextures?.[agent];
+    if (!tex) continue;
+    const s = new PIXI.Sprite(tex);
+    s.anchor.set(0.5, 0.5);
+    s.x = place.cx * TILE_SIZE + TILE_SIZE / 2;
+    // キャラの足元 = cy * TILE + TILE - 2、そこから y_offset 上にデスク中心
+    s.y = place.cy * TILE_SIZE + TILE_SIZE - 2 - place.y_offset;
+    s.width = place.w * TILE_SIZE;
+    s.height = place.h * TILE_SIZE;
+    // y-sort: キャラの zIndex (20 + container.y) より +20 でデスクを前面に
+    s.zIndex = 20 + s.y + 20;
+    charLayer.addChild(s);
   }
   stage.addChild(charLayer);
 
