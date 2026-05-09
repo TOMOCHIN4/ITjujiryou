@@ -1,12 +1,13 @@
 // Phase 3.0 NES topdown RPG: タイル定数・マップデータ・座標変換のシングルソース。
 // scene.js / movement.js / characters.js から参照される。
 
-export const TILE_SIZE = 32;
+export const TILE_SIZE = 64;
 export const MAP_COLS = 16;
 export const MAP_ROWS = 12;
-export const STAGE_SCALE = 1.5;
+export const STAGE_SCALE = 0.75;
 
-// canvas 800x600 内に 論理 512x384 を 1.5x で描画 = 768x576。レターボックス上下左右 16/12 黒。
+// canvas 800x600 内に 論理 1024x768 を 0.75x で描画 = 768x576。レターボックス上下左右 16/12 黒。
+// 16-bit SNES テイスト (asset-maker 生成) 用に TILE_SIZE 32→64 へ拡大。STAGE_SCALE で従来と同じ表示サイズ維持。
 export const STAGE_OFFSET_X = 16;
 export const STAGE_OFFSET_Y = 12;
 

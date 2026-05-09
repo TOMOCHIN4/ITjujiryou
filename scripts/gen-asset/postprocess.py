@@ -2,7 +2,7 @@
 # >>> Claude Code Init >>>
 """画像の後処理：透かし除去 → リサイズ → 0.5MB 以下に圧縮。
 
-gen-image / gen-sprites の共通パイプラインで利用される。
+gen-image / asset-maker の共通パイプラインで利用される。
 """
 
 import argparse

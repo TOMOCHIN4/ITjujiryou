@@ -79,12 +79,12 @@ export function buildCharacter(agent, def, onClick, agentTextures = null) {
     },
   });
   label.anchor.set(0.5, 1);
-  label.y = -28;
+  label.y = -56;
   container.addChild(label);
 
   container.eventMode = "static";
   container.cursor = "pointer";
-  container.hitArea = new PIXI.Rectangle(-16, -32, 32, 36);
+  container.hitArea = new PIXI.Rectangle(-32, -64, 64, 72);
   container.on("pointertap", () => onClick(agent));
   container.on("pointerover", () => { body.tint = 0xddddff; });
   container.on("pointerout",  () => { body.tint = 0xffffff; });

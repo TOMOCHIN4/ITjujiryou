@@ -66,13 +66,12 @@ scripts/gen-asset/venv/bin/python scripts/gen-asset/gen_image.py \
   --out .build/gen-asset/raw/logo_v2.png
 ```
 
-## gen-image と gen-sprites の使い分け
+## gen-image と asset-maker の使い分け
 
 | 状況 | 選択 |
 |---|---|
 | 単発（1〜2 枚） | `gen-image` |
-| 同テイストで 4 枚以上揃えたい | `gen-sprites`（4K 1 枚で済むので API コスト効率が良い） |
-| 3x3 未満の小グリッド | `gen-image` を複数回 |
+| 同テイストで 4 枚以上揃えたい / 8 種類のバリエーション / 歩行アニメ等の連続フレーム | `asset-maker`（3x3 グリッド 1 枚で 8 個取れるので API コスト効率が良い） |
 
 ## 関連
-- 派生 Skill：`gen-sprites`（グリッド生成→分割）
+- 派生 Skill：`asset-maker`（3x3 グリッド生成 → セル分割 → 背景透過 → スプライトシート化）
