@@ -4,7 +4,7 @@
 import { createScene } from "/pixel-static/scene.js";
 import { dispatch } from "/pixel-static/eventMap.js";
 import { CHAR_DEFS } from "/pixel-static/characters.js";
-import { loadCharSheet, loadTileset, loadDesks, loadBackground, loadDecor } from "/pixel-static/spriteLoader.js";
+import { loadCharSheet, loadDesks, loadBackground, loadDecor } from "/pixel-static/spriteLoader.js";
 import { makeMovement } from "/pixel-static/movement.js";
 
 // ---- DOM 参照 ----
@@ -22,9 +22,8 @@ const latestEvent = $("#latest-event");
 const recentMessages = $("#recent-messages");
 
 // ---- スプライト読み込み + シーン構築 ----
-const [charTextures, tileTextures, deskTextures, backgroundTexture, decorTextures] = await Promise.all([
+const [charTextures, deskTextures, backgroundTexture, decorTextures] = await Promise.all([
   loadCharSheet(),    // 5 キャラ × 4方向 × 2フレーム = 40 frame (Phase 3.0)
-  loadTileset(),      // 床/壁タイル (フォールバック用、v4.2 で背景 1 枚絵に置換)
   loadDesks(),        // 5 デスク (souther 1x3 / yuko 2x3 凹型 / 三兄弟 1x2) (v4.1)
   loadBackground(),   // オフィス 1 枚絵背景 1024x768 (v4.2、目チカチカ防止)
   loadDecor(),        // 壁装飾 (社訓額縁など) (v4.3)
@@ -32,12 +31,26 @@ const [charTextures, tileTextures, deskTextures, backgroundTexture, decorTexture
 const scene = await createScene($("#pixi-root"), {
   onCharClick: openPanel,
   charTextures,
-  tileTextures,
   deskTextures,
   backgroundTexture,
   decorTextures,
 });
 const movement = makeMovement(scene.charactersById);
+
+// 会話パネルの TTL が満了したら、相手から「返答」を受けたケースに限って
+// dwell 中の visitor を帰宅させる。
+// 判定: lastSpeaker !== id の場合のみ release。これにより、
+//  - 自発パネルだけが消えた (返答未着) → visitor は安全弁 (movement の SAFETY_DWELL_MS=120s) まで待機
+//  - 相手の返答パネルが消えた → visitor は即座に帰路
+scene.dialog.setOnTtlExpire(({ left, right, lastSpeaker }) => {
+  for (const id of [left, right]) {
+    if (!id || !movement.isDwelling(id)) continue;
+    if (lastSpeaker && lastSpeaker !== id) {
+      movement.releaseVisitor(id);
+    }
+  }
+});
+
 window.__pixelDebug = {
   scene,
   movement,

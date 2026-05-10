@@ -14,6 +14,13 @@
   --warn: #ffd17a;
   --bad: #ff8a8a;
   --line: #3a3450;
+
+  /* ───── キャラ固有色 (characters.js CHAR_DEFS と同期) ───── */
+  --char-color-souther:  #b18cff;  /* 紫 */
+  --char-color-yuko:     #ffa3c1;  /* ピンク */
+  --char-color-writer:   #b6e388;  /* 緑 (ハオウ) */
+  --char-color-designer: #ffd17a;  /* 黄 (トシ) */
+  --char-color-engineer: #88d8ff;  /* 水色 (センシロウ) */
 }
 
 * { box-sizing: border-box; }
@@ -113,14 +120,14 @@ body {
   position: relative; /* email-popup-layer を absolute で重ねるため */
 }
 
-/* ───── メール popup overlay (canvas 上の右上) ───── */
+/* ───── メール popup overlay (canvas 上の右下、メールトレイ風) ───── */
 .email-popup-layer {
   position: absolute;
-  top: 12px;
+  bottom: 12px;
   right: 12px;
   width: 280px;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse; /* 新着が下に積まれる (視線に近い位置に最新) */
   gap: 8px;
   pointer-events: none;
   z-index: 5;
@@ -200,6 +207,134 @@ body {
 }
 .email-card.incoming .email-progress { background: #6cb6ff; }
 .email-card.outgoing .email-progress { background: #88d8a3; }
+
+/* ───── 会話パネル (壁面 2 枠) overlay ───── */
+.dialog-panel-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4; /* email-popup-layer (5) より下、scene より上 */
+}
+
+.dialog-panel {
+  position: absolute;
+  width: 220px;
+  max-height: 200px;
+  padding: 10px 12px 8px;
+  background: rgba(248, 246, 255, 0.94);
+  color: #1c1830;
+  border-radius: 6px;
+  border: 1px solid rgba(60, 50, 90, 0.4);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 220ms ease, transform 220ms cubic-bezier(0.2, 0.8, 0.3, 1.2);
+  pointer-events: auto;
+  overflow: hidden;
+}
+.dialog-panel.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.dialog-panel.dismiss {
+  opacity: 0;
+  transform: translateY(-12px);
+}
+
+.dialog-panel--left {
+  left: 12px;
+  top: 12px;
+  border-left: 6px solid var(--accent-color, #b18cff);
+}
+.dialog-panel--right {
+  right: 12px;
+  top: 12px;
+  border-right: 6px solid var(--accent-color, #b18cff);
+  text-align: left;
+}
+
+.dialog-panel__header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  border-bottom: 1px dashed rgba(60, 50, 90, 0.3);
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+}
+.dialog-panel__name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-color, #1c1830);
+}
+.dialog-panel__role {
+  font-size: 10px;
+  color: #6a607c;
+}
+
+.dialog-panel__action {
+  display: inline-block;
+  padding: 1px 6px;
+  margin-bottom: 4px;
+  background: var(--accent-color, #b18cff);
+  color: #ffffff;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  /* 一部のキャラ色 (黄/水色/緑) は淡いので、テキストを濃いめに */
+}
+.dialog-panel[data-char="designer"] .dialog-panel__action,
+.dialog-panel[data-char="writer"]   .dialog-panel__action,
+.dialog-panel[data-char="engineer"] .dialog-panel__action,
+.dialog-panel[data-char="yuko"]     .dialog-panel__action {
+  color: #1c1830;
+}
+
+.dialog-panel__subject {
+  font-weight: 600;
+  font-size: 11px;
+  margin: 2px 0 4px;
+  color: #2a2440;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.dialog-panel__text {
+  font-size: 11px;
+  color: #2a2440;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.dialog-panel__inner {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dotted rgba(60, 50, 90, 0.3);
+  font-size: 11px;
+  font-style: italic;
+  color: #5a5070;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.dialog-panel__inner-label {
+  display: block;
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  color: #8a7fa8;
+  margin-bottom: 2px;
+}
 
 #pixi-root canvas {
   display: block;

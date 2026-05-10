@@ -210,6 +210,24 @@ def _tool_defs() -> list[Tool]:
                 "required": ["task_id", "deliverable_paths_json", "delivery_message"],
             },
         ),
+        Tool(
+            name="record_thought",
+            description=(
+                "ユウコ専用。クライアント案件を処理中の内省・心のうちを 1 文記録する。"
+                "これは pixel UI のユウコパネル『心のうち』枠に表示される独白で、"
+                "クライアント・社長・部下には届かない、純粋な表示用のフレーバー。"
+                "業務判断や指示は含めず、感じたこと・気づき・小さな葛藤を 1 文で。"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "from_agent": {"type": "string", "description": "発信者 (yuko 固定)"},
+                    "text": {"type": "string", "description": "心のうち本文 (1〜2 文程度)"},
+                    "task_id": {"type": "string", "description": "案件 ID (任意)"},
+                },
+                "required": ["from_agent", "text"],
+            },
+        ),
     ]
 
 
@@ -653,6 +671,35 @@ async def _handle_deliver(args: dict[str, Any]) -> list[TextContent]:
     return _text(f"納品完了。{len(paths)} ファイルをクライアントへ届けました。")
 
 
+async def _handle_record_thought(args: dict[str, Any]) -> list[TextContent]:
+    from_agent = args.get("from_agent") or ""
+    text = (args.get("text") or "").strip()
+    task_id = args.get("task_id") or None
+
+    if from_agent != "yuko":
+        return _text(f"ERROR: record_thought はユウコ専用。'{from_agent}' は使用不可。")
+    if not text:
+        return _text("ERROR: text が空です。")
+
+    store = get_store()
+    # 心のうちは messages テーブルに自分宛 (yuko→yuko) で type='thought' で投入
+    msg_id = await store.add_message("yuko", "yuko", text, "thought", task_id)
+    await log(
+        "yuko",
+        f"心のうち: {text[:120]}{'…' if len(text) > 120 else ''}",
+        event_type="thought",
+        task_id=task_id,
+        details={
+            "agent": "yuko",
+            "from_agent": "yuko",
+            "to_agent": "yuko",
+            "message_type": "thought",
+            "preview": text[:200],
+        },
+    )
+    return _text(f"OK: 心のうちを記録しました (msg_id={msg_id[:8]})。")
+
+
 _HANDLERS = {
     "send_message": _handle_send_message,
     "dispatch_task": _handle_dispatch_task,
@@ -663,6 +710,7 @@ _HANDLERS = {
     "update_status": _handle_update_status,
     "read_status": _handle_read_status,
     "deliver": _handle_deliver,
+    "record_thought": _handle_record_thought,
 }
 
 

@@ -18,6 +18,11 @@ const STEP_MS = 180;  // 1 タイル 0.18 秒
 const FACINGS = ["down", "up", "left", "right"];
 const BROTHERS = new Set(["writer", "designer", "engineer"]);
 
+// 訪問者の最大滞在時間 (ms)。相手が応答しなかったときの最終帰宅トリガ。
+// 通常は dialogPanel の onTtlExpire (返答パネル消滅) で先に解放されるため、
+// ここに到達するのは「相手から返答が来ない」ケースだけ。
+const SAFETY_DWELL_MS = 120000;
+
 function facingFromTo(a, b) {
   const dx = b.tx - a.tx, dy = b.ty - a.ty;
   if (dx > 0) return "right";
@@ -101,6 +106,9 @@ function planScriptedPath(visitor, host) {
 
 export function makeMovement(charactersById) {
   const activeTimelines = new Map();
+  // dwellState: visitor が host 席に着いてパネル消失を待っている状態
+  //   visitor → { host, startReturn, safetyTimer }
+  const dwellState = new Map();
   const charTilePos = {};
   for (const [agent, c] of Object.entries(charactersById)) {
     const home = CHAR_HOME_TILE[agent] || { tx: 0, ty: 0 };
@@ -214,8 +222,13 @@ export function makeMovement(charactersById) {
     return tl;
   }
 
-  /** visitor が host の home 隣接へ往復 */
-  function visitDesk(visitor, host, dwellMs = 1500) {
+  /**
+   * visitor が host の home 隣接へ往復。
+   * 滞在は固定タイマではなく **外部 release 待ち** (dialogPanel の onTtlExpire 経由)。
+   * 安全弁として SAFETY_DWELL_MS で自動帰宅。
+   * 第 3 引数 dwellMs は無視 (互換のため残す)。
+   */
+  function visitDesk(visitor, host, _dwellMsIgnored = 0) {
     const c = charactersById[visitor];
     if (!c) return null;
     const home = CHAR_HOME_TILE[visitor];
@@ -235,45 +248,39 @@ export function makeMovement(charactersById) {
       const dest = pickDestNearHost(host, occupiedOut);
       if (!dest) return null;
       dwellFacing = facingFromTo(dest, hostHome);
-      const fromTile = { ...charTilePos[visitor] };
-      pathOut = bfsPath(fromTile, dest, occupiedOut);
-      if (pathOut.length === 0 && (fromTile.tx !== dest.tx || fromTile.ty !== dest.ty)) {
+      const fromTile0 = { ...charTilePos[visitor] };
+      pathOut = bfsPath(fromTile0, dest, occupiedOut);
+      if (pathOut.length === 0 && (fromTile0.tx !== dest.tx || fromTile0.ty !== dest.ty)) {
         return null;
       }
     }
     const fromTile = { ...charTilePos[visitor] };
 
-    activeTimelines.get(visitor)?.kill();
-    const tl = gsap.timeline({ onComplete: () => activeTimelines.delete(visitor) });
-
-    // 往路
-    let prev = fromTile;
-    for (const step of pathOut) {
-      const facing = facingFromTo(prev, step);
-      tl.call(() => setPose(visitor, "walking", facing));
-      tl.to(c, {
-        x: tileToCharX(step.tx), y: tileToCharY(step.ty),
-        duration: STEP_MS / 1000, ease: "none",
-        onUpdate: () => { c.zIndex = 20 + c.y; },
-      });
-      tl.call(() => { charTilePos[visitor] = { tx: step.tx, ty: step.ty }; });
-      prev = { tx: step.tx, ty: step.ty };
+    // 既存の dwell があればクリア (再呼び出しで上書き)
+    const prevDwell = dwellState.get(visitor);
+    if (prevDwell) {
+      clearTimeout(prevDwell.safetyTimer);
+      dwellState.delete(visitor);
     }
+    activeTimelines.get(visitor)?.kill();
 
-    // 滞在 (host の方向を向く)
-    tl.call(() => setPose(visitor, "idle", dwellFacing));
-    tl.to({}, { duration: dwellMs / 1000 });
-
-    // 帰路 (BFS は dest → home、占有再計算)
-    // home が小数の場合 (例: yuko 5.5、souther 2.8) は最後に float home へ snap して見た目を戻す。
+    // home が小数の場合 (yuko 5.5、souther 2.8) は最後に float home へ snap。
     const snapBackToFloatHome = () => {
       c.x = tileToCharX(home.tx);
       c.y = tileToCharY(home.ty);
       c.zIndex = 20 + c.y;
       charTilePos[visitor] = { tx: home.tx, ty: home.ty };
       setPose(visitor, "idle", "down");
+      activeTimelines.delete(visitor);
     };
-    tl.call(() => {
+
+    // 帰路実行: dwellState からエントリを消し、帰路 timeline を即時走らせる。
+    const startReturn = () => {
+      const entry = dwellState.get(visitor);
+      if (!entry) return;
+      clearTimeout(entry.safetyTimer);
+      dwellState.delete(visitor);
+
       let pathBack;
       if (scriptedBack) {
         pathBack = scriptedBack;
@@ -285,10 +292,7 @@ export function makeMovement(charactersById) {
         snapBackToFloatHome();
         return;
       }
-      // 帰路用のサブ timeline を即時実行
-      const sub = gsap.timeline({
-        onComplete: snapBackToFloatHome,
-      });
+      const sub = gsap.timeline({ onComplete: snapBackToFloatHome });
       let p = { ...charTilePos[visitor] };
       for (const step of pathBack) {
         const facing = facingFromTo(p, step);
@@ -301,12 +305,46 @@ export function makeMovement(charactersById) {
         sub.call(() => { charTilePos[visitor] = { tx: step.tx, ty: step.ty }; });
         p = { tx: step.tx, ty: step.ty };
       }
-      // 元の timeline は既に終了する。返す sub は activeTimelines を更新
       activeTimelines.set(visitor, sub);
+    };
+
+    // 往路 timeline: 完了したら dwellState に登録 + 安全弁発動 (release 待ち)
+    const tlOut = gsap.timeline({
+      onComplete: () => {
+        setPose(visitor, "idle", dwellFacing);
+        const safetyTimer = setTimeout(startReturn, SAFETY_DWELL_MS);
+        dwellState.set(visitor, { host, startReturn, safetyTimer });
+        // 往路 timeline 自体はここで終わる
+      },
     });
 
-    activeTimelines.set(visitor, tl);
-    return tl;
+    let prev = fromTile;
+    for (const step of pathOut) {
+      const facing = facingFromTo(prev, step);
+      tlOut.call(() => setPose(visitor, "walking", facing));
+      tlOut.to(c, {
+        x: tileToCharX(step.tx), y: tileToCharY(step.ty),
+        duration: STEP_MS / 1000, ease: "none",
+        onUpdate: () => { c.zIndex = 20 + c.y; },
+      });
+      tlOut.call(() => { charTilePos[visitor] = { tx: step.tx, ty: step.ty }; });
+      prev = { tx: step.tx, ty: step.ty };
+    }
+
+    activeTimelines.set(visitor, tlOut);
+    return tlOut;
+  }
+
+  /** 外部から release: dwell 中なら帰路を即時開始。それ以外は no-op。 */
+  function releaseVisitor(visitor) {
+    const entry = dwellState.get(visitor);
+    if (!entry) return false;
+    entry.startReturn();
+    return true;
+  }
+
+  function isDwelling(visitor) {
+    return dwellState.has(visitor);
   }
 
   function settleAt(agent, facing = "down") {
@@ -327,5 +365,5 @@ export function makeMovement(charactersById) {
     }
   }
 
-  return { walkPath, visitDesk, settleAt, stopAll, bfsPath, charTilePos };
+  return { walkPath, visitDesk, settleAt, stopAll, bfsPath, charTilePos, releaseVisitor, isDwelling };
 }

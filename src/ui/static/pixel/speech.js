@@ -1,14 +1,18 @@
 // 吹き出し (SpeechBubble) — GSAP 連動。
 // 入場: scale 0 → 1 with back.out, alpha 0 → 1
-// 滞在: 0.4s 目に小さな yoyo jitter (rotation ±1.5°)
+// 滞在: 0.4s 目に yoyo jitter (rotation ±3°)
 // 退場: scale → 0.85, alpha → 0 with power2.in
+// 視認性: drop shadow + 2px 黒外枠 + キャラ色アクセントバー + bold 13px
 
 import gsap from "https://cdn.jsdelivr.net/npm/gsap@3.12.5/+esm";
+import { CHAR_DEFS } from "/pixel-static/characters.js";
 
-const PADDING_X = 8;
-const PADDING_Y = 5;
-const FONT_SIZE = 12;
+const PADDING_X = 9;
+const PADDING_Y = 6;
+const FONT_SIZE = 13;
 const STACK_GAP = 4;
+const SHADOW_OFFSET = 2;
+const ACCENT_HEIGHT = 3;
 
 /**
  * 吹き出しを overlayLayer に追加。
@@ -22,15 +26,18 @@ const STACK_GAP = 4;
  */
 export function spawnBubble(overlayLayer, charDef, text, ttlMs, stacks, agent, getPos = null) {
   const container = new PIXI.Container();
-  container.zIndex = 30;
+  container.zIndex = 100;  // overlay 全体の中で最上位に
   container.pivot.set(0, 0);
+
+  const accentColor = CHAR_DEFS[agent]?.color ?? 0xb18cff;
 
   const label = new PIXI.Text({
     text: clampText(text),
     style: {
       fontFamily: '-apple-system, "Hiragino Sans", "Yu Gothic", sans-serif',
       fontSize: FONT_SIZE,
-      fill: 0x222233,
+      fontWeight: "bold",
+      fill: 0x1c1830,
       align: "center",
       wordWrap: true,
       wordWrapWidth: 220,
@@ -41,26 +48,38 @@ export function spawnBubble(overlayLayer, charDef, text, ttlMs, stacks, agent, g
   const w = label.width + PADDING_X * 2;
   const h = label.height + PADDING_Y * 2;
 
-  // 背景
+  // ドロップシャドウ (背景を 2px 右下にずらした半透明黒)
+  const shadow = new PIXI.Graphics()
+    .roundRect(-w / 2 + SHADOW_OFFSET, -h + SHADOW_OFFSET, w, h, 6)
+    .fill({ color: 0x000000, alpha: 0.35 });
+  container.addChild(shadow);
+
+  // 背景 (白 + 太い黒外枠)
   const bg = new PIXI.Graphics()
     .roundRect(-w / 2, -h, w, h, 6)
     .fill(0xffffff)
-    .stroke({ color: 0x000000, width: 1 });
+    .stroke({ color: 0x000000, width: 2 });
   container.addChild(bg);
 
-  // しっぽ
+  // 上端のキャラ色アクセントバー
+  const accent = new PIXI.Graphics()
+    .roundRect(-w / 2 + 3, -h + 3, w - 6, ACCENT_HEIGHT, 1.5)
+    .fill(accentColor);
+  container.addChild(accent);
+
+  // しっぽ (吹き出しの下)
   const tail = new PIXI.Graphics()
-    .moveTo(-5, 0)
-    .lineTo(5, 0)
-    .lineTo(0, 6)
+    .moveTo(-6, 0)
+    .lineTo(6, 0)
+    .lineTo(0, 7)
     .closePath()
     .fill(0xffffff)
-    .stroke({ color: 0x000000, width: 1 });
+    .stroke({ color: 0x000000, width: 2 });
   container.addChild(tail);
 
   label.anchor.set(0.5, 0);
   label.x = 0;
-  label.y = -h + PADDING_Y;
+  label.y = -h + PADDING_Y + 1;  // accent バー分だけ下げる
   container.addChild(label);
 
   // 積み上げ管理
@@ -92,9 +111,9 @@ export function spawnBubble(overlayLayer, charDef, text, ttlMs, stacks, agent, g
     ease: "back.out(1.7)",
   });
 
-  // ジッター (0.45s 目に rotation ±1.5°)
+  // ジッター (0.4s 目に rotation ±3°、視線を引き寄せる)
   gsap.to(container, {
-    rotation: 0.026,
+    rotation: 0.052,
     duration: 0.18,
     delay: 0.4,
     yoyo: true,

@@ -263,16 +263,6 @@ class Store:
             await db.commit()
         return plan_id
 
-    async def get_latest_plan(self, task_id: str) -> Optional[dict[str, Any]]:
-        async with self._connect() as db:
-            db.row_factory = aiosqlite.Row
-            cur = await db.execute(
-                "SELECT * FROM plans WHERE task_id=? ORDER BY version DESC LIMIT 1",
-                (task_id,),
-            )
-            row = await cur.fetchone()
-            return dict(row) if row else None
-
     # --- revisions (Phase 1.5) ---
     async def add_revision(
         self,
@@ -409,13 +399,6 @@ class Store:
                 (_now(), message_id),
             )
             await db.commit()
-
-    async def get_message(self, message_id: str) -> Optional[dict[str, Any]]:
-        async with self._connect() as db:
-            db.row_factory = aiosqlite.Row
-            cur = await db.execute("SELECT * FROM messages WHERE id=?", (message_id,))
-            row = await cur.fetchone()
-            return dict(row) if row else None
 
     async def find_reply(
         self,

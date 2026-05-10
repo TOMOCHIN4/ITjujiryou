@@ -1,7 +1,17 @@
-// Phase 3.0 NES topdown: WS イベント → scene.bubble + scene.emailPopup + movement.visitDesk のディスパッチ。
+// Phase 3.0 NES topdown: WS イベント → scene.bubble + scene.emailPopup + scene.dialog + movement.visitDesk のディスパッチ。
 // movementRules.canPhysicallyMove で物理移動を gate し、isClientInteraction でメール popup へ早期 route。
+// bubble は動作キュー (transient)、dialog パネルは会話ログ (lingering 8 秒)、両者を共存させる。
 
 import { canPhysicallyMove, isClientInteraction } from "/pixel-static/movementRules.js";
+
+// 訪問先で滞在する時間 (ms)。会話パネル TTL と揃えて、相手の応答パネルが
+// 消えるまで visitor が host 席に待機する見せ方にする。
+const DWELL_MS = 8000;
+// 三兄弟が L 字経路でユウコ席まで歩く所要時間 (約 720ms) より少し余裕を持たせた値。
+// report 時はこの時間だけ bubble / panel の発火を遅延させて「ユウコの所に着いてから発信」する。
+const REPORT_ARRIVAL_DELAY_MS = 800;
+
+const BROTHERS = new Set(["writer", "designer", "engineer"]);
 
 function preview(s) {
   if (!s) return "";
@@ -19,35 +29,88 @@ function bubbleListener(scene, listener, kind) {
   scene.bubble(listener, tag, 2200);
 }
 
+/** 部下/社長/秘書のいずれか (= 事務所内キャラ) か。 */
+function isStaffAgent(id) {
+  return id && id !== "client" && id !== "system";
+}
+
 export const EVENT_HANDLERS = {
-  message: (ev, scene) => {
+  message: (ev, scene, movement) => {
     const text = preview(ev.details?.message || ev.details?.preview || "💬");
-    scene.bubble(ev.agent, text || "💬", 3500);
     const to = ev.details?.to_agent;
-    if (to && to !== ev.agent && to !== "client") {
-      bubbleListener(scene, to, "message");
+    const messageType = ev.details?.message_type || "";
+
+    // 三兄弟 → ユウコ への完了報告は、必ずユウコ席まで歩いてから発信する。
+    // 自席発の bubble + 受信 bubble + パネルは到着後に遅延発火させる。
+    const isReportFromBrother = messageType === "report"
+      && BROTHERS.has(ev.agent)
+      && to === "yuko";
+
+    const fireBubblesAndPanel = () => {
+      scene.bubble(ev.agent, text || "💬", 3500);
+      if (to && to !== ev.agent && to !== "client") {
+        bubbleListener(scene, to, "message");
+        if (isStaffAgent(ev.agent) && isStaffAgent(to)) {
+          scene.dialog?.showPair({
+            speaker: ev.agent,
+            listener: to,
+            action: messageType === "report" ? "✅ 報告" : "💬 発信",
+            listenerAction: "👂 受信",
+            body: text,
+          });
+        }
+      }
+    };
+
+    if (isReportFromBrother && canPhysicallyMove(ev.agent, to)) {
+      movement?.visitDesk(ev.agent, to, DWELL_MS);
+      setTimeout(fireBubblesAndPanel, REPORT_ARRIVAL_DELAY_MS);
+    } else {
+      fireBubblesAndPanel();
     }
   },
 
   consult: (ev, scene, movement) => {
     const target = ev.details?.to;
+    const text = preview(ev.details?.preview || ev.details?.message || "");
     scene.bubble(ev.agent, "💬 相談中…", 2500);
     if (target && target !== ev.agent) {
       if (canPhysicallyMove(ev.agent, target)) {
-        movement?.visitDesk(ev.agent, target, 1500);
+        movement?.visitDesk(ev.agent, target, DWELL_MS);
       }
       bubbleListener(scene, target, "consult");
+      if (isStaffAgent(ev.agent) && isStaffAgent(target)) {
+        scene.dialog?.showPair({
+          speaker: ev.agent,
+          listener: target,
+          action: "💬 相談中",
+          listenerAction: "👂 相談を受けた",
+          body: text,
+        });
+      }
     }
   },
 
   dispatch: (ev, scene, movement) => {
     const assignee = ev.details?.assigned_to;
+    const subject = ev.details?.subject || "";
+    const text = preview(ev.details?.preview || "");
     scene.bubble(ev.agent, "📨 指示を出した", 2000);
     if (assignee && assignee !== ev.agent) {
       if (canPhysicallyMove(ev.agent, assignee)) {
-        movement?.visitDesk(ev.agent, assignee, 1400);
+        movement?.visitDesk(ev.agent, assignee, DWELL_MS);
       }
       bubbleListener(scene, assignee, "dispatch");
+      if (isStaffAgent(ev.agent) && isStaffAgent(assignee)) {
+        scene.dialog?.showPair({
+          speaker: ev.agent,
+          listener: assignee,
+          action: "📨 指示",
+          listenerAction: "📥 受領",
+          subject,
+          body: text,
+        });
+      }
     }
   },
 
@@ -65,9 +128,18 @@ export const EVENT_HANDLERS = {
     const target = ev.details?.target_agent;
     if (target && target !== ev.agent) {
       if (canPhysicallyMove(ev.agent, target)) {
-        movement?.visitDesk(ev.agent, target, 800);
+        movement?.visitDesk(ev.agent, target, DWELL_MS);
       }
       bubbleListener(scene, target, "evaluate");
+      if (isStaffAgent(ev.agent) && isStaffAgent(target)) {
+        scene.dialog?.showPair({
+          speaker: ev.agent,
+          listener: target,
+          action: tag,
+          listenerAction: "🙇 評価を受けた",
+          body: preview(ev.details?.preview || ""),
+        });
+      }
     }
   },
 
@@ -82,6 +154,14 @@ export const EVENT_HANDLERS = {
   report: (ev, scene, movement) => {
     scene.bubble(ev.agent, "✅ 報告", 2200);
     movement?.settleAt(ev.agent, "down");
+  },
+
+  thought: (ev, scene) => {
+    // ユウコ (将来は他キャラも) の独白。bubble は出さない (画面ノイズ抑制) — パネルだけ更新。
+    const agent = ev.details?.agent || ev.agent;
+    const text = preview(ev.details?.preview || ev.details?.message || "");
+    if (!agent || !text) return;
+    scene.dialog?.addThought({ agent, text });
   },
 
   order_queued: (_ev, scene) => {
@@ -110,6 +190,13 @@ export function dispatch(ev, scene, movement) {
       ttlMs: 6000,
     });
     scene.bubble("yuko", isIncoming ? "📩" : "📤", 2000);
+    // ユウコパネル (右) にもメールサマリを並走表示
+    scene.dialog?.showSingle({
+      agent: "yuko",
+      action: isIncoming ? "📩 受信メール" : "📤 送信メール",
+      subject: ev.details?.subject || "",
+      body: ev.details?.preview || ev.details?.message || "",
+    });
     return;
   }
 

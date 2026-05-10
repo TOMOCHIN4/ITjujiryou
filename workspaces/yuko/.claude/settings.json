@@ -10,6 +10,7 @@
       "mcp__itjujiryou__update_status",
       "mcp__itjujiryou__read_status",
       "mcp__itjujiryou__deliver",
+      "mcp__itjujiryou__record_thought",
       "Read",
       "Write(${CLAUDE_PROJECT_DIR}/../../outputs/**)",
       "Edit(${CLAUDE_PROJECT_DIR}/../../outputs/**)",

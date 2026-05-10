@@ -5,13 +5,14 @@
 import { CHAR_DEFS, buildCharacter, isStaff, CANVAS_W, CANVAS_H } from "/pixel-static/characters.js";
 import { spawnBubble } from "/pixel-static/speech.js";
 import { mountEmailPopupLayer } from "/pixel-static/emailPopup.js";
+import { mountDialogPanelLayer } from "/pixel-static/dialogPanel.js";
 import {
-  TILE_SIZE, MAP_COLS, MAP_ROWS, MAP, tileAt, TILE_NAME, TILE,
+  TILE_SIZE, MAP_COLS, MAP_ROWS,
   STAGE_SCALE, STAGE_OFFSET_X, STAGE_OFFSET_Y, tileToPx, tileToPy,
   DESK_PLACEMENT, DECOR_PLACEMENT,
 } from "/pixel-static/tilemap.js";
 
-export async function createScene(rootEl, { onCharClick, charTextures = null, tileTextures = null, deskTextures = null, backgroundTexture = null, decorTextures = null }) {
+export async function createScene(rootEl, { onCharClick, charTextures = null, deskTextures = null, backgroundTexture = null, decorTextures = null }) {
   const app = new PIXI.Application();
   await app.init({
     width: CANVAS_W,
@@ -52,30 +53,6 @@ export async function createScene(rootEl, { onCharClick, charTextures = null, ti
     }
   }
   stage.addChild(floor);
-
-  // ───────── furnitureLayer (壁・玉座・机・受付・植物・書類・赤絨毯) ─────────
-  const furniture = new PIXI.Container();
-  furniture.zIndex = 10;
-  furniture.sortableChildren = true;
-
-  for (let ty = 0; ty < MAP_ROWS; ty++) {
-    for (let tx = 0; tx < MAP_COLS; tx++) {
-      const id = tileAt(tx, ty);
-      if (id === TILE.FLOOR_A || id === TILE.FLOOR_B || id === TILE.EMPTY) continue;
-      const name = TILE_NAME[id];
-      const tex = tileTextures?.[name];
-      if (!tex) continue;
-      const s = new PIXI.Sprite(tex);
-      s.x = tileToPx(tx);
-      s.y = tileToPy(ty);
-      s.width = TILE_SIZE;
-      s.height = TILE_SIZE;
-      // y-sort: 家具とキャラを y で重ね合わせ。家具は base 10 + y/16 (キャラ 20 + y より下になる)
-      s.zIndex = 10 + s.y;
-      furniture.addChild(s);
-    }
-  }
-  stage.addChild(furniture);
 
   // ───────── decorLayer (壁装飾: 社訓額縁など) ─────────
   const decor = new PIXI.Container();
@@ -142,13 +119,24 @@ export async function createScene(rootEl, { onCharClick, charTextures = null, ti
   // ───────── メール popup overlay (HTML、canvas の上の右上に積む) ─────────
   const emailLayer = mountEmailPopupLayer(rootEl);
 
+  // ───────── 会話パネル overlay (壁面 2 枠) ─────────
+  const dialogLayer = mountDialogPanelLayer(rootEl);
+
   return {
     app,
     bubble,
     emailPopup: emailLayer.show,
+    dialog: {
+      showPair: dialogLayer.showPair,
+      showSingle: dialogLayer.showSingle,
+      addThought: dialogLayer.addThought,
+      clear: dialogLayer.clear,
+      setOnTtlExpire: dialogLayer.setOnTtlExpire,
+    },
     charactersById,
     destroy: () => {
       emailLayer.destroy();
+      dialogLayer.destroy();
       app.destroy(true, { children: true });
     },
   };
