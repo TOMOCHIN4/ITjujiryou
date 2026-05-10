@@ -34,24 +34,33 @@ function facingFromTo(a, b) {
  * Returns: { pathOut: [...], dwellFacing, pathBack: [...] } または null
  */
 function planScriptedPath(visitor, host) {
-  // 三兄弟 → ユウコ: 真上に登り、ユウコ高さで横移動して停止
+  // 三兄弟 → ユウコ
   if (host === "yuko" && BROTHERS.has(visitor)) {
     const visitorHome = CHAR_HOME_TILE[visitor];
-    const startTx = Math.round(visitorHome.tx);
-    const startTy = Math.round(visitorHome.ty);
-    const meetTy = 6; // ユウコ desk 中段 (Yuko 自身の row と同じ)
+    const homeTx = visitorHome.tx;
+    const homeTy = visitorHome.ty;
 
-    // 訪問先 x: 中央以外なら Yuko desk の左/右脇、中央 (Toshi) なら真上
+    // Toshi (tx=7.5、center) は真上に 1 タイルだけ歩く。整数化すると 0.5 タイル右にズレるので
+    // 浮動座標のまま animation する (walkPath は tileToCharX/Y で float OK)。
+    if (homeTx >= 7 && homeTx <= 8) {
+      return {
+        pathOut: [{ tx: homeTx, ty: homeTy - 1 }],
+        dwellFacing: "up",
+        pathBack: [{ tx: homeTx, ty: homeTy }],
+      };
+    }
+
+    // 端 (Haoh, Senshirou) は整数 L 字: 真上 → ユウコ高さ → 横に脇へ
+    const startTx = Math.round(homeTx);
+    const startTy = Math.round(homeTy);
+    const meetTy = 6;
     let stopTx, dwellFacing;
     if (startTx < 7) {
       stopTx = 4;  // Yuko desk west edge の外側
       dwellFacing = "right";
-    } else if (startTx > 8) {
+    } else {
       stopTx = 11; // Yuko desk east edge の外側
       dwellFacing = "left";
-    } else {
-      stopTx = startTx;  // Toshi: 真上
-      dwellFacing = "up";
     }
 
     const pathOut = [];
@@ -65,9 +74,7 @@ function planScriptedPath(visitor, host) {
     }
 
     // 帰路は逆順 (横戻し → 下に降りる)
-    // ※ 最後の y は startTy ではなく startTy-1 まで (= home 行の 1 つ上)。
-    //   home が小数 (8.5 など) の場合に y=9 まで行くと char.zIndex が一瞬 desk.zIndex を超えて
-    //   キャラ全身が机の前面に表示されてしまうため、最終 0.5 タイルは snapBackToFloatHome に任せる。
+    // ※ 最後の y は startTy-1 まで (= home 行の 1 つ上)。最終 0.5 タイルは snapBackToFloatHome に任せて z-glitch 回避。
     const pathBack = [];
     if (stopTx > startTx) {
       for (let x = stopTx - 1; x >= startTx; x--) pathBack.push({ tx: x, ty: meetTy });
@@ -79,20 +86,14 @@ function planScriptedPath(visitor, host) {
     return { pathOut, dwellFacing, pathBack };
   }
 
-  // ユウコ → サザン: 真上に登り、Souther desk の少し下で停止
+  // ユウコ → サザン: 真上に 1 タイルだけ歩く (浮動座標を維持して右にズレないように)
   if (visitor === "yuko" && host === "souther") {
     const yukoHome = CHAR_HOME_TILE.yuko;
-    const startTx = Math.round(yukoHome.tx);
-    const startTy = Math.round(yukoHome.ty);
-    const meetTy = 4;  // Souther desk south 直下
-
-    const pathOut = [];
-    for (let y = startTy - 1; y >= meetTy; y--) pathOut.push({ tx: startTx, ty: y });
-    // 復路は home 行 (startTy) の手前で停止、float home への snap に任せる (z-index グリッチ回避)
-    const pathBack = [];
-    for (let y = meetTy + 1; y < startTy; y++) pathBack.push({ tx: startTx, ty: y });
-
-    return { pathOut, dwellFacing: "up", pathBack };
+    return {
+      pathOut: [{ tx: yukoHome.tx, ty: yukoHome.ty - 1 }],
+      dwellFacing: "up",
+      pathBack: [{ tx: yukoHome.tx, ty: yukoHome.ty }],
+    };
   }
 
   return null;
