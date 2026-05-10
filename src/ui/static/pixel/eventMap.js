@@ -118,7 +118,7 @@ export const EVENT_HANDLERS = {
     scene.bubble(ev.agent, "📋 プラン作成", 2000);
   },
 
-  evaluate: (ev, scene, movement) => {
+  evaluate: (ev, scene, _movement) => {
     const v = ev.details?.decision;
     const tag = v === "approve" ? "✅ 承認"
               : v === "revise"  ? "↩ 差戻"
@@ -127,9 +127,7 @@ export const EVENT_HANDLERS = {
     scene.bubble(ev.agent, tag, 2500);
     const target = ev.details?.target_agent;
     if (target && target !== ev.agent) {
-      if (canPhysicallyMove(ev.agent, target)) {
-        movement?.visitDesk(ev.agent, target, DWELL_MS);
-      }
+      // ユウコ→部下 の物理移動はしない (席は動かさず、bubble + 壁面パネルだけ出す)
       bubbleListener(scene, target, "evaluate");
       if (isStaffAgent(ev.agent) && isStaffAgent(target)) {
         scene.dialog?.showPair({

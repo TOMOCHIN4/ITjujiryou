@@ -106,8 +106,14 @@ def test_yuko_can_dispatch_and_deliver():
 
 
 def test_souther_claude_md_contains_quotes():
-    """社長 CLAUDE.md に名台詞集 (21選) が含まれていること。"""
-    claude_md = (REPO_ROOT / "workspaces" / "souther" / "CLAUDE.md").read_text(encoding="utf-8")
+    """社長 CLAUDE.md (本体 + @import モジュール) に名台詞集が含まれていること。
+    モジュール化後は本体に直接書かれていないので、_modules/quotes.md も合わせて確認する。"""
+    souther_dir = REPO_ROOT / "workspaces" / "souther"
+    bodies = [
+        (souther_dir / "CLAUDE.md").read_text(encoding="utf-8"),
+        (souther_dir / "_modules" / "quotes.md").read_text(encoding="utf-8"),
+    ]
+    combined = "\n".join(bodies)
     keys = ["天空に極星はふたつはいらぬ", "敵はすべて下郎", "もう一度ぬくもりを"]
     for k in keys:
-        assert k in claude_md, f"名台詞 '{k}' が CLAUDE.md に含まれていない"
+        assert k in combined, f"名台詞 '{k}' が CLAUDE.md / _modules/quotes.md に含まれていない"

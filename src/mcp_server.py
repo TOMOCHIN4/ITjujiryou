@@ -156,6 +156,12 @@ def _tool_defs() -> list[Tool]:
             description=(
                 "ユウコ専用。部下成果物の品質判定。decision は approve/revise/escalate_to_president。"
                 "revise を返した場合、必ず再 dispatch_task で revision_round を +1 して同一 subtask_id を渡す。"
+                " scores はオウガイ subagent (Task) が返した JSON 文字列をそのまま渡す。"
+                ' 形式: {"axes":[{"name":"<軸名>","score":0..5,"rationale":"<根拠1-2文>"}, ...10件]}。'
+                " 10 軸きっかり、各軸 0-5 整数、name/score/rationale 必須。"
+                " 数値そのものを書き換えてはならない (改竄禁止)。"
+                " scores から導出される推奨 decision とユウコの decision に乖離がある場合、"
+                " 1-2 周目は強めに警告、3 周目 (最終ラウンド) は裁量を尊重しつつ ℹ 注記される。"
             ),
             inputSchema={
                 "type": "object",
@@ -165,6 +171,14 @@ def _tool_defs() -> list[Tool]:
                     "evaluation": {"type": "string"},
                     "decision": {"type": "string"},
                     "round": {"type": "integer"},
+                    "scores": {
+                        "type": "string",
+                        "description": (
+                            "オウガイ subagent が返した JSON 文字列。"
+                            '{"axes":[{"name","score","rationale"} x 10]} 形式。'
+                            "省略時は警告ログのみで受理 (互換)。"
+                        ),
+                    },
                 },
                 "required": ["task_id", "subtask_id", "evaluation", "decision"],
             },
@@ -531,16 +545,85 @@ async def _handle_propose_plan(args: dict[str, Any]) -> list[TextContent]:
     return _text(f"計画を保存しました (plan_id={plan_id})。")
 
 
+RUBRIC_AXIS_COUNT = 10
+RUBRIC_SCORE_MIN = 0
+RUBRIC_SCORE_MAX = 5
+FINAL_ROUND_INDEX = MAX_REVISION_ROUNDS  # 0-indexed の最終周 (MAX=2 なら round=2 が 3 周目)
+
+
+def _validate_scores(scores_raw: str) -> tuple[Optional[list[dict[str, Any]]], Optional[str]]:
+    """scores JSON 文字列を検証。(axes, error_message) を返す。error_message が None なら成功。"""
+    try:
+        data = json.loads(scores_raw)
+    except (json.JSONDecodeError, TypeError) as e:
+        return None, f"scores JSON parse 失敗: {e}"
+    if not isinstance(data, dict) or "axes" not in data:
+        return None, "scores: トップレベルに 'axes' キーが必要"
+    axes = data["axes"]
+    if not isinstance(axes, list):
+        return None, "scores.axes は配列である必要がある"
+    if len(axes) != RUBRIC_AXIS_COUNT:
+        return None, f"scores.axes は {RUBRIC_AXIS_COUNT} 件きっかり必要 (received={len(axes)})"
+    for i, axis in enumerate(axes):
+        if not isinstance(axis, dict):
+            return None, f"scores.axes[{i}] は dict である必要がある"
+        for key in ("name", "score", "rationale"):
+            if key not in axis:
+                return None, f"scores.axes[{i}] に '{key}' が無い"
+        if not isinstance(axis["name"], str) or not axis["name"].strip():
+            return None, f"scores.axes[{i}].name は非空文字列である必要がある"
+        if not isinstance(axis["rationale"], str) or not axis["rationale"].strip():
+            return None, f"scores.axes[{i}].rationale は非空文字列である必要がある"
+        score = axis["score"]
+        if not isinstance(score, int) or isinstance(score, bool):
+            return None, f"scores.axes[{i}].score は整数である必要がある"
+        if not (RUBRIC_SCORE_MIN <= score <= RUBRIC_SCORE_MAX):
+            return None, f"scores.axes[{i}].score は {RUBRIC_SCORE_MIN}..{RUBRIC_SCORE_MAX} の範囲 (received={score})"
+    return axes, None
+
+
+def _recommend_decision(axes: list[dict[str, Any]]) -> str:
+    """scores → 推奨 decision (approve/revise/escalate_to_president)。満点 50 ベース。"""
+    values = [a["score"] for a in axes]
+    total = sum(values)
+    minimum = min(values)
+    if minimum == 0:
+        return "escalate_to_president"
+    if minimum <= 2:
+        return "revise"
+    if total >= 44 and minimum >= 4:
+        return "approve"
+    if total <= 33:
+        return "escalate_to_president"
+    return "revise"
+
+
 async def _handle_evaluate_deliverable(args: dict[str, Any]) -> list[TextContent]:
     task_id = args["task_id"]
     subtask_id = args["subtask_id"]
     evaluation = args["evaluation"]
     decision = args["decision"]
     round_ = int(args.get("round") or 0)
+    scores_raw = args.get("scores")
 
     valid = ("approve", "revise", "escalate_to_president")
     if decision not in valid:
         return _text(f"ERROR: decision は {valid} のいずれか。'{decision}' は不可。")
+
+    # scores バリデーションと推奨 decision 算出
+    axes: Optional[list[dict[str, Any]]] = None
+    recommended: Optional[str] = None
+    scores_warning: Optional[str] = None
+    if scores_raw:
+        axes, err = _validate_scores(scores_raw)
+        if err is not None:
+            return _text(f"ERROR: {err}")
+        recommended = _recommend_decision(axes)
+    else:
+        scores_warning = (
+            "⚠ scores 未指定。オウガイ subagent (Task) を呼んで 10 軸採点を取得し、"
+            "返ってきた JSON 文字列をそのまま scores 引数に渡してください (改竄禁止)。"
+        )
 
     store = get_store()
 
@@ -551,9 +634,13 @@ async def _handle_evaluate_deliverable(args: dict[str, Any]) -> list[TextContent
             decision = "escalate_to_president"
             auto_escalated = True
 
-    rev_id = await store.add_revision(task_id, subtask_id, round_, evaluation, decision)
+    rev_id = await store.add_revision(
+        task_id, subtask_id, round_, evaluation, decision, scores=scores_raw
+    )
     # 評価対象の担当者を解決 (subtask の assigned_to)
-    target_agent = await store.get_subtask_assignee(subtask_id) if hasattr(store, "get_subtask_assignee") else None
+    target_agent = await store.get_subtask_assignee(subtask_id)
+    total = sum(a["score"] for a in axes) if axes else None
+    minimum = min(a["score"] for a in axes) if axes else None
     await log(
         "yuko",
         f"evaluate (sub={subtask_id[:8]}, round={round_}, decision={decision})"
@@ -568,10 +655,31 @@ async def _handle_evaluate_deliverable(args: dict[str, Any]) -> list[TextContent
             "from_agent": "yuko",
             "to_agent": target_agent,
             "message_type": "evaluation",
+            "scores_total": total,
+            "scores_min": minimum,
+            "recommended_decision": recommended,
         },
     )
 
     msg = f"評価記録 (rev_id={rev_id[:8]}, decision={decision})"
+    if axes is not None:
+        msg += f"\nscores: 合計 {total}/50, 最低 {minimum}/5, 推奨 decision={recommended}"
+    if scores_warning:
+        msg += f"\n{scores_warning}"
+    # 推奨と裁量が乖離した場合の周回別フィードバック
+    if recommended and recommended != decision and not auto_escalated:
+        is_final_round = round_ >= FINAL_ROUND_INDEX
+        if is_final_round:
+            msg += (
+                f"\nℹ scores から導出される推奨 decision は '{recommended}' ですが、"
+                "最終ラウンドのため裁量で受理しました。"
+            )
+        else:
+            msg += (
+                f"\n⚠ scores から導出される推奨 decision は '{recommended}' です。"
+                "数値そのものを書き換えてはなりません。再考を推奨します "
+                "(根拠を読んで案件文脈と照合してください)。"
+            )
     if auto_escalated:
         msg += (
             f"\n注: 修正が上限 ({MAX_REVISION_ROUNDS}) を超過するため、自動的に "

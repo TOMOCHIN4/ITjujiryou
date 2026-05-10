@@ -61,6 +61,41 @@ async def test_create_subtask_explicit_id_idempotent(store):
     assert len(subs) == 1
 
 
+async def test_last_event_id_empty_returns_zero(store):
+    assert await store.last_event_id() == 0
+
+
+async def test_last_event_id_returns_max_id(store):
+    tid = await store.create_task("t", "d", "r")
+    # update_task_status は内部で log_event(status_change) を呼ぶ
+    await store.update_task_status(tid, "approved")
+    eid1 = await store.last_event_id()
+    assert eid1 > 0
+    await store.update_task_status(tid, "delivered")
+    eid2 = await store.last_event_id()
+    assert eid2 > eid1
+
+
+async def test_list_events_since_id_returns_only_newer(store):
+    tid = await store.create_task("t", "d", "r")
+    await store.update_task_status(tid, "approved")
+    cutoff = await store.last_event_id()
+    await store.update_task_status(tid, "delivered")
+    new_events = await store.list_events(since_id=cutoff)
+    assert all(ev["id"] > cutoff for ev in new_events)
+    assert len(new_events) >= 1
+
+
+async def test_get_subtask_assignee_returns_assignee(store):
+    tid = await store.create_task("t", "d", "r")
+    sid = await store.create_subtask(tid, "writer", "exec")
+    assert await store.get_subtask_assignee(sid) == "writer"
+
+
+async def test_get_subtask_assignee_returns_none_for_unknown(store):
+    assert await store.get_subtask_assignee("nonexistent") is None
+
+
 async def test_list_tasks_filter(store):
     a = await store.create_task("a", "d", "r")
     b = await store.create_task("b", "d", "r")

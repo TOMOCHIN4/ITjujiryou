@@ -67,6 +67,7 @@ class Store:
 
         await add_if_missing("events", "parent_event_id", "parent_event_id INTEGER")
         await add_if_missing("messages", "delivered_at", "delivered_at TEXT")
+        await add_if_missing("revisions", "scores", "scores TEXT")
 
     # --- tasks ---
     async def create_task(
@@ -183,6 +184,14 @@ class Store:
             )
             return [dict(r) for r in await cur.fetchall()]
 
+    async def get_subtask_assignee(self, sub_id: str) -> Optional[str]:
+        async with self._connect() as db:
+            cur = await db.execute(
+                "SELECT assigned_to FROM subtasks WHERE id=?", (sub_id,)
+            )
+            row = await cur.fetchone()
+            return row[0] if row else None
+
     # --- messages ---
     async def add_message(
         self,
@@ -271,13 +280,14 @@ class Store:
         round_: int,
         evaluation: str,
         decision: str,
+        scores: Optional[str] = None,
     ) -> str:
         rev_id = _new_id()
         async with self._connect() as db:
             await db.execute(
                 "INSERT INTO revisions (id, task_id, subtask_id, round, evaluation, "
-                "decision, created_at) VALUES (?,?,?,?,?,?,?)",
-                (rev_id, task_id, subtask_id, round_, evaluation, decision, _now()),
+                "decision, scores, created_at) VALUES (?,?,?,?,?,?,?,?)",
+                (rev_id, task_id, subtask_id, round_, evaluation, decision, scores, _now()),
             )
             await db.commit()
         return rev_id
@@ -355,6 +365,13 @@ class Store:
                 d["details"] = {"raw": d["details"]}
             out.append(d)
         return out
+
+    async def last_event_id(self) -> int:
+        """events テーブルの最大 id (空なら 0)。pump タスクの起点用。"""
+        async with self._connect() as db:
+            cur = await db.execute("SELECT COALESCE(MAX(id), 0) FROM events")
+            row = await cur.fetchone()
+            return int(row[0]) if row else 0
 
     async def log_event(
         self,
