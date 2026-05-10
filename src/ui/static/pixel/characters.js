@@ -23,6 +23,17 @@ const WALK_SPEED = 0.15;
 
 const FACINGS = ["down", "up", "left", "right"];
 
+// asset 不整合 (lf と rt が混在したり逆だったり) を防御するため、
+// 各キャラごとに「実際に左向きの 2 フレームを含むテクスチャキー」を明示。
+// 右向き表示は LEFT_TEXTURE_KEY を流用して body.scale.x = -1 で水平反転。
+const LEFT_TEXTURE_KEY = {
+  writer:   "left",   // lf_a/b は正しく左向き
+  designer: "left",
+  yuko:     "left",
+  souther:  "left",
+  engineer: "right",  // engineer は lf と rt が逆、rt_a/b が実際は左向き
+};
+
 /**
  * agentTextures = { down:[Texture, Texture], up:[..], left:[..], right:[..] }
  * 各 facing は 2 frame walk アニメ。idle は frame[0] で gotoAndStop。
@@ -92,15 +103,21 @@ export function buildCharacter(agent, def, onClick, agentTextures = null) {
   container._body = body;
   // body の本来 scale.x を保持 (反転時に符号だけ反転させるため)
   container._baseScaleX = body.scale.x;
+  // 当キャラの「真の左向き」テクスチャキー。
+  container._leftKey = LEFT_TEXTURE_KEY[agent] || "left";
   container.setState = function (state, facing) {
     facing = facing || this._facing || "down";
     if (!FACINGS.includes(facing)) facing = "down";
     if (this._currentState === state && this._facing === facing) return;
     this._currentState = state;
     this._facing = facing;
-    // right 向きは left texture を流用して水平反転で表現する
-    // (rt_a/rt_b に左向きフレームが混入する asset 不整合の防御)
-    const textureKey = (facing === "right") ? "left" : facing;
+    // 左右はキャラ別の「真の左向き」テクスチャを流用、右向きは水平反転で表現。
+    let textureKey;
+    if (facing === "left" || facing === "right") {
+      textureKey = this._leftKey;
+    } else {
+      textureKey = facing;
+    }
     const tex = this._textures?.[textureKey];
     if (!tex) return;
     this._body.textures = tex;
