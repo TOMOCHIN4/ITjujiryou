@@ -194,11 +194,19 @@ async def api_post_order(req: OrderRequest) -> dict[str, Any]:
         )
 
     msg_id = await store.add_message("client", "yuko", text, "email", task_id)
+    title_for_event = text.splitlines()[0][:60] or "(無題)"
     await store.log_event(
         "client",
         "order_queued",
         task_id,
-        details={"msg_id": msg_id, "preview": text[:120]},
+        details={
+            "msg_id": msg_id,
+            "from_agent": "client",
+            "to_agent": "yuko",
+            "message_type": "email",
+            "subject": title_for_event,
+            "preview": text[:300],
+        },
     )
     return {
         "task_id": task_id,

@@ -16,6 +16,7 @@ import {
 
 const STEP_MS = 180;  // 1 タイル 0.18 秒
 const FACINGS = ["down", "up", "left", "right"];
+const BROTHERS = new Set(["writer", "designer", "engineer"]);
 
 function facingFromTo(a, b) {
   const dx = b.tx - a.tx, dy = b.ty - a.ty;
@@ -23,6 +24,78 @@ function facingFromTo(a, b) {
   if (dx < 0) return "left";
   if (dy > 0) return "down";
   return "up";
+}
+
+/**
+ * 物語的な動線を scripted で返す。BFS の最短経路ではなく、
+ * 「真上に登る → 直角に曲がる → 横移動して停止」型の L 字経路。
+ * 該当ペア以外は null を返し、呼び出し側は BFS にフォールバック。
+ *
+ * Returns: { pathOut: [...], dwellFacing, pathBack: [...] } または null
+ */
+function planScriptedPath(visitor, host) {
+  // 三兄弟 → ユウコ: 真上に登り、ユウコ高さで横移動して停止
+  if (host === "yuko" && BROTHERS.has(visitor)) {
+    const visitorHome = CHAR_HOME_TILE[visitor];
+    const startTx = Math.round(visitorHome.tx);
+    const startTy = Math.round(visitorHome.ty);
+    const meetTy = 6; // ユウコ desk 中段 (Yuko 自身の row と同じ)
+
+    // 訪問先 x: 中央以外なら Yuko desk の左/右脇、中央 (Toshi) なら真上
+    let stopTx, dwellFacing;
+    if (startTx < 7) {
+      stopTx = 4;  // Yuko desk west edge の外側
+      dwellFacing = "right";
+    } else if (startTx > 8) {
+      stopTx = 11; // Yuko desk east edge の外側
+      dwellFacing = "left";
+    } else {
+      stopTx = startTx;  // Toshi: 真上
+      dwellFacing = "up";
+    }
+
+    const pathOut = [];
+    // 1) 真上に登る
+    for (let y = startTy - 1; y >= meetTy; y--) pathOut.push({ tx: startTx, ty: y });
+    // 2) 横に曲がる
+    if (stopTx > startTx) {
+      for (let x = startTx + 1; x <= stopTx; x++) pathOut.push({ tx: x, ty: meetTy });
+    } else if (stopTx < startTx) {
+      for (let x = startTx - 1; x >= stopTx; x--) pathOut.push({ tx: x, ty: meetTy });
+    }
+
+    // 帰路は逆順 (横戻し → 下に降りる)
+    // ※ 最後の y は startTy ではなく startTy-1 まで (= home 行の 1 つ上)。
+    //   home が小数 (8.5 など) の場合に y=9 まで行くと char.zIndex が一瞬 desk.zIndex を超えて
+    //   キャラ全身が机の前面に表示されてしまうため、最終 0.5 タイルは snapBackToFloatHome に任せる。
+    const pathBack = [];
+    if (stopTx > startTx) {
+      for (let x = stopTx - 1; x >= startTx; x--) pathBack.push({ tx: x, ty: meetTy });
+    } else if (stopTx < startTx) {
+      for (let x = stopTx + 1; x <= startTx; x++) pathBack.push({ tx: x, ty: meetTy });
+    }
+    for (let y = meetTy + 1; y < startTy; y++) pathBack.push({ tx: startTx, ty: y });
+
+    return { pathOut, dwellFacing, pathBack };
+  }
+
+  // ユウコ → サザン: 真上に登り、Souther desk の少し下で停止
+  if (visitor === "yuko" && host === "souther") {
+    const yukoHome = CHAR_HOME_TILE.yuko;
+    const startTx = Math.round(yukoHome.tx);
+    const startTy = Math.round(yukoHome.ty);
+    const meetTy = 4;  // Souther desk south 直下
+
+    const pathOut = [];
+    for (let y = startTy - 1; y >= meetTy; y--) pathOut.push({ tx: startTx, ty: y });
+    // 復路は home 行 (startTy) の手前で停止、float home への snap に任せる (z-index グリッチ回避)
+    const pathBack = [];
+    for (let y = meetTy + 1; y < startTy; y++) pathBack.push({ tx: startTx, ty: y });
+
+    return { pathOut, dwellFacing: "up", pathBack };
+  }
+
+  return null;
 }
 
 export function makeMovement(charactersById) {
@@ -39,9 +112,14 @@ export function makeMovement(charactersById) {
   }
 
   /** BFS で from → to の 4 方向経路を算出。終点は isWalkable 不問。
-   *  occupied (Set<"tx,ty">) のタイルは avoid。到達不能なら []。 */
+   *  occupied (Set<"tx,ty">) のタイルは avoid。到達不能なら []。
+   *  CHAR_HOME_TILE は小数を含む (例: 2.8) ので整数 tile グリッドで動作させる。 */
   function bfsPath(from, to, occupied = new Set()) {
-    if (from.tx === to.tx && from.ty === to.ty) return [];
+    const fromR = { tx: Math.round(from.tx), ty: Math.round(from.ty) };
+    const toR = { tx: Math.round(to.tx), ty: Math.round(to.ty) };
+    if (fromR.tx === toR.tx && fromR.ty === toR.ty) return [];
+    from = fromR;
+    to = toR;
     const key = (t) => `${t.tx},${t.ty}`;
     const visited = new Set([key(from)]);
     const queue = [{ tx: from.tx, ty: from.ty, parent: null }];
@@ -143,17 +221,26 @@ export function makeMovement(charactersById) {
     const hostHome = CHAR_HOME_TILE[host];
     if (!home || !hostHome) return null;
 
-    const occupiedOut = currentOccupiedTiles(visitor);
-    const dest = pickDestNearHost(host, occupiedOut);
-    if (!dest) return null;
-    const dwellFacing = facingFromTo(dest, hostHome);
+    // scripted な動線が定義されている (visitor, host) ペアはそれを優先
+    const scripted = planScriptedPath(visitor, host);
 
-    const fromTile = { ...charTilePos[visitor] };
-    const pathOut = bfsPath(fromTile, dest, occupiedOut);
-    if (pathOut.length === 0 && (fromTile.tx !== dest.tx || fromTile.ty !== dest.ty)) {
-      // 到達不能 — 吹き出しだけは出すので no-op
-      return null;
+    let pathOut, dwellFacing, scriptedBack = null;
+    if (scripted) {
+      pathOut = scripted.pathOut;
+      dwellFacing = scripted.dwellFacing;
+      scriptedBack = scripted.pathBack;
+    } else {
+      const occupiedOut = currentOccupiedTiles(visitor);
+      const dest = pickDestNearHost(host, occupiedOut);
+      if (!dest) return null;
+      dwellFacing = facingFromTo(dest, hostHome);
+      const fromTile = { ...charTilePos[visitor] };
+      pathOut = bfsPath(fromTile, dest, occupiedOut);
+      if (pathOut.length === 0 && (fromTile.tx !== dest.tx || fromTile.ty !== dest.ty)) {
+        return null;
+      }
     }
+    const fromTile = { ...charTilePos[visitor] };
 
     activeTimelines.get(visitor)?.kill();
     const tl = gsap.timeline({ onComplete: () => activeTimelines.delete(visitor) });
@@ -177,16 +264,29 @@ export function makeMovement(charactersById) {
     tl.to({}, { duration: dwellMs / 1000 });
 
     // 帰路 (BFS は dest → home、占有再計算)
+    // home が小数の場合 (例: yuko 5.5、souther 2.8) は最後に float home へ snap して見た目を戻す。
+    const snapBackToFloatHome = () => {
+      c.x = tileToCharX(home.tx);
+      c.y = tileToCharY(home.ty);
+      c.zIndex = 20 + c.y;
+      charTilePos[visitor] = { tx: home.tx, ty: home.ty };
+      setPose(visitor, "idle", "down");
+    };
     tl.call(() => {
-      const occupiedReturn = currentOccupiedTiles(visitor);
-      const pathBack = bfsPath(charTilePos[visitor], home, occupiedReturn);
+      let pathBack;
+      if (scriptedBack) {
+        pathBack = scriptedBack;
+      } else {
+        const occupiedReturn = currentOccupiedTiles(visitor);
+        pathBack = bfsPath(charTilePos[visitor], home, occupiedReturn);
+      }
       if (pathBack.length === 0) {
-        setPose(visitor, "idle", "down");
+        snapBackToFloatHome();
         return;
       }
       // 帰路用のサブ timeline を即時実行
       const sub = gsap.timeline({
-        onComplete: () => setPose(visitor, "idle", "down"),
+        onComplete: snapBackToFloatHome,
       });
       let p = { ...charTilePos[visitor] };
       for (const step of pathBack) {

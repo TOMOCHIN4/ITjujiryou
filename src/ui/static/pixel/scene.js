@@ -4,6 +4,7 @@
 
 import { CHAR_DEFS, buildCharacter, isStaff, CANVAS_W, CANVAS_H } from "/pixel-static/characters.js";
 import { spawnBubble } from "/pixel-static/speech.js";
+import { mountEmailPopupLayer } from "/pixel-static/emailPopup.js";
 import {
   TILE_SIZE, MAP_COLS, MAP_ROWS, MAP, tileAt, TILE_NAME, TILE,
   STAGE_SCALE, STAGE_OFFSET_X, STAGE_OFFSET_Y, tileToPx, tileToPy,
@@ -138,10 +139,17 @@ export async function createScene(rootEl, { onCharClick, charTextures = null, ti
     spawnBubble(overlay, initialPos, text, ttlMs, bubbleStacks, agent, getPos);
   }
 
+  // ───────── メール popup overlay (HTML、canvas の上の右上に積む) ─────────
+  const emailLayer = mountEmailPopupLayer(rootEl);
+
   return {
     app,
     bubble,
+    emailPopup: emailLayer.show,
     charactersById,
-    destroy: () => app.destroy(true, { children: true }),
+    destroy: () => {
+      emailLayer.destroy();
+      app.destroy(true, { children: true });
+    },
   };
 }

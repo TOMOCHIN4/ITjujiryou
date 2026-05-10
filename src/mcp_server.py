@@ -240,6 +240,12 @@ async def _handle_send_message(args: dict[str, Any]) -> list[TextContent]:
         f"→ {to} ({message_type}): {content[:120]}{'…' if len(content) > 120 else ''}",
         event_type="message",
         task_id=task_id,
+        details={
+            "from_agent": from_agent,
+            "to_agent": to,
+            "message_type": message_type,
+            "preview": content[:200],
+        },
     )
     return _text(
         f"OK: {to} 宛のメッセージを保存しました (msg_id={msg_id[:8]})。"
@@ -337,7 +343,15 @@ async def _handle_dispatch_task(args: dict[str, Any]) -> list[TextContent]:
         f"dispatch_task → {assigned_to} (sub={sub_id[:8]}, round={revision_round})",
         event_type="dispatch",
         task_id=task_id,
-        details={"assigned_to": assigned_to, "subtask_id": sub_id, "round": revision_round},
+        details={
+            "assigned_to": assigned_to,
+            "subtask_id": sub_id,
+            "round": revision_round,
+            "from_agent": "yuko",
+            "to_agent": assigned_to,
+            "message_type": "directive",
+            "subject": f"📨 指示 (round {revision_round})",
+        },
     )
     return _text(
         f"OK: {assigned_to} へ dispatch しました。\n"
@@ -387,6 +401,13 @@ async def _handle_consult_peer(args: dict[str, Any]) -> list[TextContent]:
         f"→ {to} (consult): {question[:120]}{'…' if len(question) > 120 else ''}",
         event_type="consult",
         task_id=task_id,
+        details={
+            "to": to,
+            "from_agent": from_agent,
+            "to_agent": to,
+            "message_type": "consult",
+            "preview": question[:200],
+        },
     )
 
     reply = await _poll_reply(
@@ -424,8 +445,15 @@ async def _handle_consult_souther(args: dict[str, Any]) -> list[TextContent]:
     await log(
         from_agent,
         f"→ souther ({message_type}): {content[:120]}{'…' if len(content) > 120 else ''}",
-        event_type="message",
+        event_type="consult",
         task_id=task_id,
+        details={
+            "to": "souther",
+            "from_agent": from_agent,
+            "to_agent": "souther",
+            "message_type": message_type,
+            "preview": content[:200],
+        },
     )
 
     reply = await _poll_reply(
@@ -506,13 +534,23 @@ async def _handle_evaluate_deliverable(args: dict[str, Any]) -> list[TextContent
             auto_escalated = True
 
     rev_id = await store.add_revision(task_id, subtask_id, round_, evaluation, decision)
+    # 評価対象の担当者を解決 (subtask の assigned_to)
+    target_agent = await store.get_subtask_assignee(subtask_id) if hasattr(store, "get_subtask_assignee") else None
     await log(
         "yuko",
         f"evaluate (sub={subtask_id[:8]}, round={round_}, decision={decision})"
         + (" [自動escalate]" if auto_escalated else ""),
         event_type="evaluate",
         task_id=task_id,
-        details={"decision": decision, "round": round_, "auto_escalated": auto_escalated},
+        details={
+            "decision": decision,
+            "round": round_,
+            "auto_escalated": auto_escalated,
+            "target_agent": target_agent,
+            "from_agent": "yuko",
+            "to_agent": target_agent,
+            "message_type": "evaluation",
+        },
     )
 
     msg = f"評価記録 (rev_id={rev_id[:8]}, decision={decision})"
@@ -603,6 +641,14 @@ async def _handle_deliver(args: dict[str, Any]) -> list[TextContent]:
         f"→ client: 納品完了 ({len(paths)} ファイル)",
         event_type="delivery",
         task_id=task_id,
+        details={
+            "from_agent": "yuko",
+            "to_agent": "client",
+            "message_type": "email",
+            "subject": "📦 納品完了",
+            "preview": delivery_message[:300],
+            "deliverable_count": len(paths),
+        },
     )
     return _text(f"納品完了。{len(paths)} ファイルをクライアントへ届けました。")
 

@@ -1,32 +1,54 @@
-// Phase 3.0 NES topdown: WS イベント → scene.bubble + movement.visitDesk のディスパッチ。
-// 旧 Phase 2.5-rev のサザン専用ポーズ (throne_*) と inferSazanPose は完全削除。
-// サザンも 4方向 walk + idle のみで、玉座座位はキャラスプライト自身で表現しない (玉座家具は scene 側)。
+// Phase 3.0 NES topdown: WS イベント → scene.bubble + scene.emailPopup + movement.visitDesk のディスパッチ。
+// movementRules.canPhysicallyMove で物理移動を gate し、isClientInteraction でメール popup へ早期 route。
+
+import { canPhysicallyMove, isClientInteraction } from "/pixel-static/movementRules.js";
 
 function preview(s) {
   if (!s) return "";
   return String(s).replace(/\s+/g, " ").trim();
 }
 
+/** speaker の bubble + listener (host) の受信 bubble を出すヘルパ。 */
+function bubbleListener(scene, listener, kind) {
+  if (!listener) return;
+  const tag = kind === "consult"  ? "👂 相談を受けた"
+            : kind === "dispatch" ? "📥 指示を受けた"
+            : kind === "evaluate" ? "🙇 評価を受けた"
+            : kind === "message"  ? "👂 受信"
+            :                       "👂";
+  scene.bubble(listener, tag, 2200);
+}
+
 export const EVENT_HANDLERS = {
   message: (ev, scene) => {
     const text = preview(ev.details?.message || ev.details?.preview || "💬");
     scene.bubble(ev.agent, text || "💬", 3500);
+    const to = ev.details?.to_agent;
+    if (to && to !== ev.agent && to !== "client") {
+      bubbleListener(scene, to, "message");
+    }
   },
 
   consult: (ev, scene, movement) => {
     const target = ev.details?.to;
-    if (target && target !== ev.agent) {
-      movement?.visitDesk(ev.agent, target, 1500);
-    }
     scene.bubble(ev.agent, "💬 相談中…", 2500);
+    if (target && target !== ev.agent) {
+      if (canPhysicallyMove(ev.agent, target)) {
+        movement?.visitDesk(ev.agent, target, 1500);
+      }
+      bubbleListener(scene, target, "consult");
+    }
   },
 
   dispatch: (ev, scene, movement) => {
     const assignee = ev.details?.assigned_to;
-    if (assignee && assignee !== ev.agent) {
-      movement?.visitDesk(ev.agent, assignee, 1400);
-    }
     scene.bubble(ev.agent, "📨 指示を出した", 2000);
+    if (assignee && assignee !== ev.agent) {
+      if (canPhysicallyMove(ev.agent, assignee)) {
+        movement?.visitDesk(ev.agent, assignee, 1400);
+      }
+      bubbleListener(scene, assignee, "dispatch");
+    }
   },
 
   plan: (ev, scene) => {
@@ -42,12 +64,19 @@ export const EVENT_HANDLERS = {
     scene.bubble(ev.agent, tag, 2500);
     const target = ev.details?.target_agent;
     if (target && target !== ev.agent) {
-      movement?.visitDesk(ev.agent, target, 800);
+      if (canPhysicallyMove(ev.agent, target)) {
+        movement?.visitDesk(ev.agent, target, 800);
+      }
+      bubbleListener(scene, target, "evaluate");
     }
   },
 
   delivery: (ev, scene) => {
-    scene.bubble(ev.agent, "📦 納品！", 4000);
+    // クライアントへの delivery は dispatch() 冒頭の email-route で先に処理されるため
+    // ここに落ちるのは念のためのフォールバック。
+    if (!isClientInteraction(ev)) {
+      scene.bubble(ev.agent, "📦 納品！", 4000);
+    }
   },
 
   report: (ev, scene, movement) => {
@@ -56,6 +85,8 @@ export const EVENT_HANDLERS = {
   },
 
   order_queued: (_ev, scene) => {
+    // クライアント発注も email-route で先に処理されるが、
+    // details が無い古いログ向けに fallback bubble を維持。
     scene.bubble("yuko", "📩 新着案件", 2500);
   },
 
@@ -67,6 +98,21 @@ export const EVENT_HANDLERS = {
 };
 
 export function dispatch(ev, scene, movement) {
+  // クライアント ↔ ユウコ のメールやり取りは最優先で email popup へ
+  if (isClientInteraction(ev)) {
+    const isIncoming = ev.details?.from_agent === "client";
+    scene.emailPopup({
+      direction: isIncoming ? "incoming" : "outgoing",
+      sender: isIncoming ? "client" : "yuko",
+      recipient: isIncoming ? "yuko" : "client",
+      subject: ev.details?.subject || (ev.event_type === "delivery" ? "📦 納品" : "📩 案件"),
+      body: ev.details?.preview || ev.details?.message || "",
+      ttlMs: 6000,
+    });
+    scene.bubble("yuko", isIncoming ? "📩" : "📤", 2000);
+    return;
+  }
+
   const handler = EVENT_HANDLERS[ev.event_type];
   if (handler) {
     try {

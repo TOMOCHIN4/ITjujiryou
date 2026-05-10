@@ -38,7 +38,11 @@ const scene = await createScene($("#pixi-root"), {
   decorTextures,
 });
 const movement = makeMovement(scene.charactersById);
-window.__pixelDebug = { scene, movement };  // デバッグコンソールから操作するためのフック
+window.__pixelDebug = {
+  scene,
+  movement,
+  dispatch: (ev) => dispatch(ev, scene, movement),
+};
 
 // ---- WebSocket ----
 // 接続直後はサーバが過去 100 件のスナップショットを一気に送ってくる。

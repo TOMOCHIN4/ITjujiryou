@@ -110,7 +110,96 @@ body {
   border: 1px solid var(--line);
   border-radius: 4px;
   overflow: hidden;
+  position: relative; /* email-popup-layer を absolute で重ねるため */
 }
+
+/* ───── メール popup overlay (canvas 上の右上) ───── */
+.email-popup-layer {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.email-card {
+  background: rgba(36, 32, 56, 0.95);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 6px;
+  padding: 8px 10px 6px;
+  font-size: 12px;
+  color: var(--fg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transform: translateX(40px);
+  transition: opacity 250ms ease, transform 250ms cubic-bezier(0.2, 0.8, 0.3, 1.2);
+  pointer-events: auto;
+}
+.email-card.show {
+  opacity: 1;
+  transform: translateX(0);
+}
+.email-card.dismiss {
+  opacity: 0;
+  transform: translateX(20px);
+}
+.email-card.incoming {
+  border-left-color: #6cb6ff;
+  background: rgba(36, 44, 64, 0.95);
+}
+.email-card.outgoing {
+  border-left-color: #88d8a3;
+  background: rgba(36, 56, 44, 0.95);
+}
+.email-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--fg-dim);
+  margin-bottom: 4px;
+}
+.email-icon {
+  font-size: 14px;
+}
+.email-route b {
+  color: var(--fg);
+}
+.email-subject {
+  font-weight: 600;
+  font-size: 12px;
+  margin: 2px 0;
+  color: var(--fg);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.email-body {
+  font-size: 11px;
+  color: var(--fg-dim);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.email-progress {
+  height: 2px;
+  margin-top: 6px;
+  background: var(--accent);
+  transform-origin: left center;
+  transform: scaleX(1);
+  border-radius: 1px;
+  opacity: 0.6;
+}
+.email-card.incoming .email-progress { background: #6cb6ff; }
+.email-card.outgoing .email-progress { background: #88d8a3; }
 
 #pixi-root canvas {
   display: block;

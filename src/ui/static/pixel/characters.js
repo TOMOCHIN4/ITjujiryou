@@ -90,14 +90,22 @@ export function buildCharacter(agent, def, onClick, agentTextures = null) {
   container.on("pointerout",  () => { body.tint = 0xffffff; });
 
   container._body = body;
+  // body の本来 scale.x を保持 (反転時に符号だけ反転させるため)
+  container._baseScaleX = body.scale.x;
   container.setState = function (state, facing) {
     facing = facing || this._facing || "down";
     if (!FACINGS.includes(facing)) facing = "down";
     if (this._currentState === state && this._facing === facing) return;
     this._currentState = state;
     this._facing = facing;
-    if (!this._textures?.[facing]) return;
-    this._body.textures = this._textures[facing];
+    // right 向きは left texture を流用して水平反転で表現する
+    // (rt_a/rt_b に左向きフレームが混入する asset 不整合の防御)
+    const textureKey = (facing === "right") ? "left" : facing;
+    const tex = this._textures?.[textureKey];
+    if (!tex) return;
+    this._body.textures = tex;
+    const baseScale = this._baseScaleX || 1;
+    this._body.scale.x = (facing === "right") ? -Math.abs(baseScale) : Math.abs(baseScale);
     if (state === "walking") {
       this._body.animationSpeed = WALK_SPEED;
       this._body.gotoAndPlay(0);

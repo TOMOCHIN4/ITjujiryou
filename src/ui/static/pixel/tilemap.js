@@ -64,8 +64,11 @@ export const MAP = [
 ];
 
 export function tileAt(tx, ty) {
-  if (ty < 0 || ty >= MAP_ROWS || tx < 0 || tx >= MAP_COLS) return TILE.WALL_SIDE;
-  return MAP[ty][tx];
+  // CHAR_HOME_TILE / DESK_PLACEMENT は小数 (例: 2.8) を取りうるので必ず floor する。
+  const ix = Math.floor(tx);
+  const iy = Math.floor(ty);
+  if (iy < 0 || iy >= MAP_ROWS || ix < 0 || ix >= MAP_COLS) return TILE.WALL_SIDE;
+  return MAP[iy][ix];
 }
 
 // キャラの home tile (ピクセル座標は tileToCharX/Y で変換)
