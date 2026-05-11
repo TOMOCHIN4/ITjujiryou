@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Optional
 
@@ -44,6 +45,29 @@ server: Server = Server("itjujiryou")
 
 def _text(s: str) -> list[TextContent]:
     return [TextContent(type="text", text=s)]
+
+
+_PREVIEW_HEADER_RE = re.compile(r"^【[^】]*】\s*")
+_SUBTASK_PAREN_RE = re.compile(r"\s*\(subtask(?:_id)?:\s*[^)]+\)")
+
+
+def _extract_preview(content: Optional[str], limit: int = 200) -> str:
+    """pixel UI のバブル / 壁面パネル用に、メッセージ本文から会話部分のみ抽出する。
+
+    - 「【完了報告】」「【修正サイクル N 回目】」等の角括弧見出しを除去
+    - 「(subtask: ID)」「(subtask_id: ID)」を除去
+    - マークダウン水平線「---」より前 (= 自然言語ブロック) を抽出
+    - マークダウン見出し「# / ## / ###」が来たらそこで切る
+    - 連続改行・空白を 1 つの空白に圧縮
+    """
+    if not content:
+        return ""
+    s = _PREVIEW_HEADER_RE.sub("", content)
+    s = _SUBTASK_PAREN_RE.sub("", s)
+    s = re.split(r"\n---\s*\n|\n---\s*$|^---\s*\n", s, maxsplit=1)[0]
+    s = re.split(r"\n#+\s", s, maxsplit=1)[0]
+    s = re.sub(r"\s+", " ", s).strip()
+    return s[:limit]
 
 
 # ---------------------------------------------------------------------------
@@ -276,7 +300,7 @@ async def _handle_send_message(args: dict[str, Any]) -> list[TextContent]:
             "from_agent": from_agent,
             "to_agent": to,
             "message_type": message_type,
-            "preview": content[:200],
+            "preview": _extract_preview(content),
         },
     )
     return _text(
@@ -383,6 +407,9 @@ async def _handle_dispatch_task(args: dict[str, Any]) -> list[TextContent]:
             "to_agent": assigned_to,
             "message_type": "directive",
             "subject": f"📨 指示 (round {revision_round})",
+            "preview": _extract_preview(
+                ticket.get("objective") or ticket.get("description") or dispatch_payload
+            ),
         },
     )
     return _text(
@@ -438,7 +465,7 @@ async def _handle_consult_peer(args: dict[str, Any]) -> list[TextContent]:
             "from_agent": from_agent,
             "to_agent": to,
             "message_type": "consult",
-            "preview": question[:200],
+            "preview": _extract_preview(question),
         },
     )
 
@@ -484,7 +511,7 @@ async def _handle_consult_souther(args: dict[str, Any]) -> list[TextContent]:
             "from_agent": from_agent,
             "to_agent": "souther",
             "message_type": message_type,
-            "preview": content[:200],
+            "preview": _extract_preview(content),
         },
     )
 
@@ -658,6 +685,7 @@ async def _handle_evaluate_deliverable(args: dict[str, Any]) -> list[TextContent
             "scores_total": total,
             "scores_min": minimum,
             "recommended_decision": recommended,
+            "preview": _extract_preview(evaluation),
         },
     )
 
@@ -772,7 +800,7 @@ async def _handle_deliver(args: dict[str, Any]) -> list[TextContent]:
             "to_agent": "client",
             "message_type": "email",
             "subject": "📦 納品完了",
-            "preview": delivery_message[:300],
+            "preview": _extract_preview(delivery_message, limit=300),
             "deliverable_count": len(paths),
         },
     )
@@ -802,7 +830,7 @@ async def _handle_record_thought(args: dict[str, Any]) -> list[TextContent]:
             "from_agent": "yuko",
             "to_agent": "yuko",
             "message_type": "thought",
-            "preview": text[:200],
+            "preview": _extract_preview(text),
         },
     )
     return _text(f"OK: 心のうちを記録しました (msg_id={msg_id[:8]})。")

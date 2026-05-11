@@ -15,7 +15,15 @@ const BROTHERS = new Set(["writer", "designer", "engineer"]);
 
 function preview(s) {
   if (!s) return "";
-  return String(s).replace(/\s+/g, " ").trim();
+  // backend 側 mcp_server._extract_preview と意味的に同じ二重防御。
+  // 「【...】」「(subtask: ...)」を除去 → 「---」/「# 見出し」で切る → 連続空白を圧縮。
+  return String(s)
+    .replace(/^【[^】]*】\s*/, "")
+    .replace(/\s*\(subtask(?:_id)?:\s*[^)]+\)/g, "")
+    .split(/\n---\s*\n|\n---\s*$|^---\s*\n/)[0]
+    .split(/\n#+\s/)[0]
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /** speaker の bubble + listener (host) の受信 bubble を出すヘルパ。 */
