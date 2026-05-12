@@ -72,7 +72,6 @@ CREATE TABLE IF NOT EXISTS revisions (
     round INTEGER NOT NULL,
     evaluation TEXT NOT NULL,
     decision TEXT NOT NULL,
-    scores TEXT,
     created_at TEXT NOT NULL
 );
 

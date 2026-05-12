@@ -288,7 +288,6 @@ tests/
 - `data/memory/{role}/` への経験蓄積 (各部下が Write 可能だが活用パターン未確立)
 - ピクセルアート UI (Phase 3 構想)
 - MCP 連携拡張 (Notion / Gmail / Slack / GitHub の MCP server を `.mcp.json` に追加)
-- 検閲官 subagent (品質一次レビュー専門) の追加
 
 ---
 

@@ -65,9 +65,16 @@ class Store:
             if column not in cols:
                 await db.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
 
+        async def drop_if_present(table: str, column: str) -> None:
+            cur = await db.execute(f"PRAGMA table_info({table})")
+            cols = [row[1] for row in await cur.fetchall()]
+            if column in cols:
+                await db.execute(f"ALTER TABLE {table} DROP COLUMN {column}")
+
         await add_if_missing("events", "parent_event_id", "parent_event_id INTEGER")
         await add_if_missing("messages", "delivered_at", "delivered_at TEXT")
-        await add_if_missing("revisions", "scores", "scores TEXT")
+        # 旧 10軸採点ルーブリック (検閲官オウガイ) の廃止に伴う列削除
+        await drop_if_present("revisions", "scores")
 
     # --- tasks ---
     async def create_task(
@@ -280,14 +287,13 @@ class Store:
         round_: int,
         evaluation: str,
         decision: str,
-        scores: Optional[str] = None,
     ) -> str:
         rev_id = _new_id()
         async with self._connect() as db:
             await db.execute(
                 "INSERT INTO revisions (id, task_id, subtask_id, round, evaluation, "
-                "decision, scores, created_at) VALUES (?,?,?,?,?,?,?,?)",
-                (rev_id, task_id, subtask_id, round_, evaluation, decision, scores, _now()),
+                "decision, created_at) VALUES (?,?,?,?,?,?,?)",
+                (rev_id, task_id, subtask_id, round_, evaluation, decision, _now()),
             )
             await db.commit()
         return rev_id
