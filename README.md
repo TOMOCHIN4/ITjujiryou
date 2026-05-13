@@ -14,7 +14,7 @@
 
 > リポジトリ名 `ITjujiryou` および `workspaces/{souther,yuko,designer,engineer,writer}/` の各ディレクトリ名はコード識別子としてそのまま据え置き。社名・人物像のテキスト表現のみ刷新済み。
 
-詳細仕様は [`PLAN.md`](./PLAN.md) を参照。
+詳細仕様は [`SPEC.md`](./SPEC.md) を参照。未着手 TODO のみ [`PLAN.md`](./PLAN.md) に書く。
 
 ## 構成の前提
 
@@ -147,7 +147,7 @@ outputs/                    # gitignore: 納品物
 
 ## 動作確認シナリオ
 
-PLAN.md にも記載：
+SPEC.md §8 にも記載：
 
 1. note 記事執筆 (ハオウ単独)
 2. CSV 抽出 Python スクリプト (センシロウ単独)

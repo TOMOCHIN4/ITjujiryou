@@ -2,7 +2,7 @@
 """社長 pane 用 PreToolUse hook。
 
 社長 (sauther workspace) が `send_message` を呼ぶ際、宛先 (to) が `client` で
-あれば deny する。聖帝はクライアントと直接会話しない (PLAN.md §4.1, §6 参照)。
+あれば deny する。聖帝はクライアントと直接会話しない (SPEC.md §4.1, §6 参照)。
 
 stdin に PreToolUse の event JSON が来る:
   {"hook_event_name": "PreToolUse", "tool_name": "...", "tool_input": {...}, ...}
