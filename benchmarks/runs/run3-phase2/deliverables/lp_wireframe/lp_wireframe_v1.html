@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>かたおか歯科クリニック 採用 LP ワイヤーフレーム v1</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    background: #f3f4f6;
+    color: #111;
+    padding: 24px;
+    line-height: 1.5;
+  }
+  .page-title {
+    max-width: 1200px;
+    margin: 0 auto 16px;
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .page-meta {
+    max-width: 1200px;
+    margin: 0 auto 24px;
+    font-size: 12px;
+    color: #555;
+  }
+  .layout {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+  /* Phone frame */
+  .phone {
+    width: 360px;
+    border: 2px solid #222;
+    border-radius: 28px;
+    background: #fff;
+    padding: 12px 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    position: sticky;
+    top: 24px;
+  }
+  .phone-screen {
+    border: 1px solid #ccc;
+    background: #fafafa;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  /* Wireframe block */
+  .wf {
+    border-bottom: 1px dashed #999;
+    padding: 12px;
+    position: relative;
+    background: #fff;
+  }
+  .wf.alt { background: #f5f5f5; }
+  .wf-tag {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: #222;
+    color: #fff;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+  }
+  .wf-tag.priority { background: #c0392b; }
+  .wf-tag.cta { background: #e67e22; }
+  .wf-tag.measure { background: #2980b9; }
+  .wf h3 {
+    font-size: 11px;
+    font-weight: 700;
+    color: #444;
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+  }
+  .placeholder-img {
+    background: repeating-linear-gradient(45deg, #ddd, #ddd 6px, #eaeaea 6px, #eaeaea 12px);
+    border: 1px solid #bbb;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    font-size: 10px;
+    margin: 4px 0;
+  }
+  .placeholder-img.tall { height: 160px; }
+  .placeholder-img.short { height: 80px; }
+  .placeholder-text {
+    background: #eee;
+    height: 10px;
+    margin: 4px 0;
+    border-radius: 2px;
+  }
+  .placeholder-text.w70 { width: 70%; }
+  .placeholder-text.w90 { width: 90%; }
+  .placeholder-text.w50 { width: 50%; }
+  .placeholder-text.big { height: 18px; background: #999; }
+  .cta-btn {
+    background: #e67e22;
+    color: #fff;
+    text-align: center;
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    margin: 6px 0;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .cta-btn.secondary {
+    background: #fff;
+    color: #e67e22;
+    border: 2px solid #e67e22;
+  }
+  .cta-btn.tel {
+    background: #fff;
+    color: #5a3a1a;
+    border: 2px solid #5a3a1a;
+  }
+  .cta-btn.mail {
+    background: transparent;
+    color: #555;
+    border: 1px solid #999;
+    font-weight: 500;
+  }
+  .header-bar {
+    background: #5a3a1a;
+    color: #fff;
+    padding: 10px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .sticky-cta {
+    position: sticky;
+    bottom: 0;
+    background: #5a3a1a;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: 1fr 56px;
+    gap: 6px;
+    border-top: 2px solid #c0392b;
+  }
+  .sticky-cta .cta-btn { margin: 0; }
+  .sticky-cta .tel-icon {
+    background: #fff;
+    color: #5a3a1a;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  /* Annotations panel */
+  .notes {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 24px;
+  }
+  .notes h2 {
+    font-size: 16px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #5a3a1a;
+  }
+  .notes h3 {
+    font-size: 13px;
+    margin: 16px 0 6px;
+    color: #5a3a1a;
+  }
+  .notes ul {
+    padding-left: 18px;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .notes ul li { margin-bottom: 4px; }
+  .legend {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+    font-size: 10px;
+    flex-wrap: wrap;
+  }
+  .legend span {
+    padding: 2px 8px;
+    border-radius: 3px;
+    color: #fff;
+  }
+  .form-field {
+    margin: 6px 0;
+    font-size: 10px;
+  }
+  .form-field label {
+    color: #555;
+    display: block;
+    margin-bottom: 2px;
+  }
+  .form-field .input-box {
+    border: 1px solid #aaa;
+    background: #fff;
+    height: 32px;
+    border-radius: 4px;
+  }
+  .form-field .input-box.textarea { height: 60px; }
+  .form-field .input-box.preset {
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    color: #666;
+    font-size: 9px;
+  }
+  .ga-marker {
+    background: #2980b9;
+    color: #fff;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    display: inline-block;
+    margin: 2px 0;
+  }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .phone { position: static; }
+    .layout { grid-template-columns: 1fr 1fr; gap: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">かたおか歯科クリニック 採用 LP ワイヤーフレーム v1 (スマホ縦長 1 カラム)</div>
+<div class="page-meta">
+  case-id: 2026-05-13-kataoka-dental ／ subtask: 02de47e4-87fc-40f5-b480-f815ef3d05b4 ／ 訴求軸順位: ⓐ リコール 60 分 → ⓑ 個室 9 台 → ⓒ 子育て両立 → ⓓ 院長から学べる
+  <div class="legend">
+    <span style="background:#c0392b;">PRIORITY: 訴求軸</span>
+    <span style="background:#e67e22;">CTA</span>
+    <span style="background:#2980b9;">GA4 計測</span>
+    <span style="background:#222;">構造</span>
+  </div>
+</div>
+
+<div class="layout">
+
+<!-- =================== PHONE FRAME =================== -->
+<div class="phone">
+<div class="phone-screen">
+
+<!-- Header -->
+<div class="header-bar">
+  <span>[LOGO] かたおか歯科</span>
+  <span style="background:#e67e22; padding:4px 8px; border-radius:3px;">応募</span>
+</div>
+
+<!-- Section 1: Hero -->
+<div class="wf">
+  <span class="wf-tag">SEC 01 / HERO</span>
+  <h3>ヒーロー</h3>
+  <div class="placeholder-img tall">[ヒーロー画像: スタッフ集合 or 個室の自然光景]</div>
+  <div class="placeholder-text big w90"></div>
+  <div class="placeholder-text big w70"></div>
+  <div class="placeholder-text w90"></div>
+  <div class="placeholder-text w70"></div>
+  <div class="cta-btn">▶ 応募フォームへ進む</div>
+  <div class="cta-btn tel">📞 電話で問い合わせ (tap-to-call)</div>
+  <span class="ga-marker">GA4: hero_view / cta_click_hero</span>
+</div>
+
+<!-- Section 2: 訴求軸 ⓐ -->
+<div class="wf alt">
+  <span class="wf-tag priority">SEC 02 / 軸 ⓐ</span>
+  <h3>リコール 60 分 — 患者さん 1 人と長く関わる</h3>
+  <div class="placeholder-img">[院長または衛生士の施術風景 / 60分計測の可視化]</div>
+  <div class="placeholder-text w90"></div>
+  <div class="placeholder-text w90"></div>
+  <div class="placeholder-text w70"></div>
+</div>
+
+<!-- Section 3: 訴求軸 ⓑ -->
+<div class="wf">
+  <span class="wf-tag priority">SEC 03 / 軸 ⓑ</span>
+  <h3>個室 9 台 (2022 リニューアル)</h3>
+  <div class="placeholder-img">[個室内観写真 横長]</div>
+  <div class="placeholder-text w90"></div>
+  <div class="placeholder-text w70"></div>
+</div>
+
+<!-- Section 4: 訴求軸 ⓒ -->
+<div class="wf alt">
+  <span class="wf-tag priority">SEC 04 / 軸 ⓒ</span>
+  <h3>子育てと両立できる長く働ける環境</h3>
+  <div class="placeholder-img short">[時短勤務スタッフの写真 / 院内託児想起のアイコン]</div>
+  <div class="placeholder-text w90"></div>
+  <div class="placeholder-text w90"></div>
+  <div class="placeholder-text w50"></div>
+</div>
+
+<!-- Section 5: 訴求軸 ⓓ -->
+<div class="wf">
+  <span class="wf-tag priority">SEC 05 / 軸 ⓓ</span>
+  <h3>院長から直接学べる</h3>
+  <div class="placeholder-img">[院長プロフィール写真 + 経歴]</div>
+  <div class="placeholder-text w90"></div>
+  <div class="placeholder-text w70"></div>
+</div>
+
+<!-- Section 6: 待遇 -->
+<div class="wf alt">
+  <span class="wf-tag">SEC 06 / 待遇</span>
+  <h3>待遇詳細</h3>
+  <div style="font-size:9px; color:#444;">
+    <div>月給 30 万円〜 / 賞与 年 2 回 (実績 2 ヶ月)</div>
+    <div>年休 135 日 / 残業 月 5h 以下</div>
+    <div>社保完備 / 退職金あり / 産休育休実績あり</div>
+    <div>家賃半額補助 (上限月 4 万) / 引越し手当 県外 10 万</div>
+    <div>制服貸与 / 院内 OJT</div>
+  </div>
+  <span class="ga-marker">GA4: scroll_75</span>
+</div>
+
+<!-- Section 7: Application Form -->
+<div class="wf">
+  <span class="wf-tag cta">SEC 07 / 応募フォーム</span>
+  <h3>応募フォーム (最優先 CTA)</h3>
+  <div class="form-field"><label>氏名 [必須]</label><div class="input-box"></div></div>
+  <div class="form-field"><label>フリガナ [必須]</label><div class="input-box"></div></div>
+  <div class="form-field">
+    <label>所属 (大学・学部・学年) [必須]</label>
+    <div class="input-box preset">徳島大学 歯学部 口腔保健科 ___年 (プリセット候補)</div>
+  </div>
+  <div class="form-field"><label>電話番号 [必須]</label><div class="input-box"></div></div>
+  <div class="form-field"><label>メールアドレス [必須]</label><div class="input-box"></div></div>
+  <div class="form-field"><label>自由記述 (志望動機・質問など) [任意]</label><div class="input-box textarea"></div></div>
+  <div class="cta-btn">▶ 内容を確認して送信</div>
+  <div style="text-align:center; margin:8px 0; font-size:9px; color:#666;">— または —</div>
+  <div class="cta-btn tel">📞 電話する (tap-to-call: tel:)</div>
+  <div class="cta-btn mail">✉ メールで問合せ (mailto:)</div>
+  <span class="ga-marker">GA4: form_view / form_submit / cta_click_tel / cta_click_mail</span>
+</div>
+
+<!-- Section 8: Footer -->
+<div class="wf alt">
+  <span class="wf-tag">SEC 08 / FOOTER</span>
+  <h3>クリニック情報・フッター</h3>
+  <div style="font-size:9px;">
+    <div>大阪府枚方市南楠葉 ...</div>
+    <div>樟葉駅徒歩 5 分</div>
+    <div>公式サイトへ →</div>
+    <div style="color:#888; margin-top:6px;">© kataoka dental clinic</div>
+  </div>
+</div>
+
+<!-- Sticky CTA bar -->
+<div class="sticky-cta">
+  <div class="cta-btn" style="margin:0;">応募する</div>
+  <div class="tel-icon">📞</div>
+</div>
+
+</div><!-- /phone-screen -->
+</div><!-- /phone -->
+
+<!-- =================== NOTES PANEL =================== -->
+<div class="notes">
+  <h2>ワイヤー注釈 — 設計判断ポイント</h2>
+
+  <h3>1. セクション構成と優先順位</h3>
+  <ul>
+    <li>スクロール順 = 訴求軸の優先順位 ⓐ→ⓑ→ⓒ→ⓓ。離脱点 (おそらく 50% 前後) までに ⓐⓑ を消化する設計。</li>
+    <li>ヒーローは「リコール 60 分・患者と長く関わる仕事」を学生の体験言語で。コピーは writer (ハオウ) 担当。</li>
+    <li>軸 ⓐ をヒーロー直下に置くことで R3 (学生に伝わりにくい) リスクを冒頭で消化する。</li>
+  </ul>
+
+  <h3>2. 応募 CTA 配置</h3>
+  <ul>
+    <li><b>ヒーロー直下</b>: primary「応募フォームへ」+ secondary「電話で問い合わせ」(tel: スキーム)。離脱前の即押し用。</li>
+    <li><b>ページ末尾</b>: 応募フォーム本体 + 「電話する」「メールで問合せ」(mailto:) の補助 CTA。</li>
+    <li><b>Sticky 追従 CTA バー (推奨)</b>: スクロール中も画面下に常時表示。primary「応募する」+ 電話アイコン。スマホ親指動線で押下率を引き上げる。<b>採用推奨</b>。</li>
+    <li>LINE は本案件対象外。</li>
+  </ul>
+
+  <h3>3. 応募フォーム想定項目</h3>
+  <ul>
+    <li>氏名 / フリガナ / 所属 / 電話 / メール / 自由記述 の 6 項目。住所・生年月日・年齢は <b>個人情報の過剰取得</b> となるため取得しない (求人法令配慮)。</li>
+    <li>所属欄に「徳島大学 歯学部 口腔保健科」を <b>プリセット候補</b> として出す (placeholder or プルダウン先頭)。徳島大ターゲットを離脱させない狙い。</li>
+    <li>自由記述は任意。志望動機を強要しない (学生の心理障壁を下げる)。</li>
+  </ul>
+
+  <h3>4. スマホ実機操作の前提</h3>
+  <ul>
+    <li>タップ領域は CTA ボタン全て <b>min-height 44px</b>。フォーム入力欄も同様。</li>
+    <li>本文 <b>font-size 16px 以上</b>。iOS Safari の auto-zoom 抑止も兼ねる。</li>
+    <li>レスポンシブは <b>375px 〜 768px</b> を最小限の範囲でカバー。PC 表示は中央寄せの読み物レイアウトで崩れない最小限。</li>
+  </ul>
+
+  <h3>5. 計測タグ (GA4) の埋め込み位置</h3>
+  <ul>
+    <li><code>&lt;head&gt;</code> 末尾に gtag.js (実際の <b>GA4 測定 ID は院長確認後</b>に差し込み)。</li>
+    <li>イベント: <code>hero_view</code> / <code>scroll_50</code> / <code>scroll_75</code> / <code>cta_click_hero</code> / <code>cta_click_sticky</code> / <code>cta_click_tel</code> / <code>cta_click_mail</code> / <code>form_view</code> / <code>form_submit</code>。</li>
+    <li>UTM パラメータの受け取り想定 (徳島大学掲示板 QR、合説 QR、SNS 等で配布する URL を別キャンペーンとして見分けるため)。</li>
+    <li>Cookie 同意バナーは取得情報が GA4 のみの場合 <b>不要</b>と判断 (国内ガイドラインのみ準拠、別途院長確認)。</li>
+  </ul>
+
+  <h3>6. 実装方針 (Phase 4 で着手)</h3>
+  <ul>
+    <li><b>フレームワーク非依存</b>の素 HTML/CSS/JS 第一選択。運用引継ぎ容易性 (院長側に CMS なし)。</li>
+    <li>画像は <b>WebP + jpg fallback</b>、ヒーロー画像は <code>loading="eager"</code>、以降は <code>loading="lazy"</code>。</li>
+    <li>Lighthouse 目標: Performance 80+ / Accessibility 90+ / SEO 90+。</li>
+    <li>応募フォームの送信先は Phase 4 着手時に決定: ① Google Form 埋め込み (運用最小) ② FormSubmit / Formspree (送信先 mail) ③ 簡易自前 PHP。<b>① を推奨</b>。</li>
+  </ul>
+
+  <h3>7. 求人法令の構造上の配慮 (機械チェック観点)</h3>
+  <ul>
+    <li>年齢制限フィールド <b>無し</b> (取得しない)。</li>
+    <li>性別フィールド <b>無し</b>。</li>
+    <li>「若い人募集」「女性歓迎」等の禁止表現はコピー側 (writer) で機械チェック想定。</li>
+    <li>労働条件 (待遇セクション) は職業安定法の明示義務項目を網羅 (賃金 / 就業時間 / 休日 / 社保 / 加入保険)。</li>
+  </ul>
+
+  <h3>8. 兄弟との擦り合わせ予定 (6/1 目処)</h3>
+  <ul>
+    <li><b>writer (ハオウ)</b>: ヒーローコピー + 各セクション見出しのトーン共有。文字量上限の合意。consult_peer 経由。</li>
+    <li><b>designer (トシ)</b>: ヒーロー画像のアスペクト比 (推奨 16:9 もしくは 4:3 横長)、各セクションのビジュアル方針、茶 + オレンジのカラー仕様。consult_peer 経由。</li>
+  </ul>
+
+  <h3>9. 申し送り (Phase 4 実装担当へ)</h3>
+  <ul>
+    <li>GA4 測定 ID は院長から取得後に差し込み。</li>
+    <li>応募フォーム送信先は Phase 4 開始時に院長と最終決定。</li>
+    <li>ヒーロー画像のアスペクト比はトシ確定値に合わせて CSS の <code>aspect-ratio</code> を Phase 4 で固定。</li>
+    <li>引越し手当・家賃補助は <b>転居前提学生</b> 向けに目立たせる位置を Phase 4 で再検討 (待遇内に埋もれないように)。</li>
+  </ul>
+</div>
+
+</div><!-- /layout -->
+
+</body>
+</html>

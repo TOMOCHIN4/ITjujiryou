@@ -1,0 +1,261 @@
+/* かたおか歯科クリニック 採用 LP — 色: 茶色基調 + 暖色アクセント */
+
+:root {
+  --bg: #FAF6F0;
+  --bg-alt: #F2EAD9;
+  --text: #2E2620;
+  --text-mute: #5A4E45;
+  --brand: #6B4A2B;      /* 焦げ茶 */
+  --accent: #E6A45F;     /* 暖色オレンジ */
+  --accent-dark: #C28447;
+  --line: #D9C9AE;
+  --max-width: 720px;
+}
+
+* { box-sizing: border-box; }
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+  font-size: 16px;
+  line-height: 1.75;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+/* ヘッダー */
+.site-header {
+  background: var(--brand);
+  color: #FFF;
+  padding: 0.75rem 0;
+  font-size: 0.875rem;
+}
+.site-header .brand { margin: 0; font-weight: 600; }
+.site-header .location { margin: 0.125rem 0 0; font-size: 0.8125rem; opacity: 0.85; }
+
+/* ヒーロー */
+.hero {
+  background: linear-gradient(180deg, var(--bg-alt) 0%, var(--bg) 100%);
+  padding: 3rem 0 2.5rem;
+  text-align: center;
+}
+.hero-eyebrow {
+  display: inline-block;
+  color: var(--brand);
+  background: #FFF;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+.hero-catch {
+  font-size: 1.75rem;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 1rem;
+}
+.hero-sub {
+  font-size: 1rem;
+  color: var(--text-mute);
+  margin: 0 0 2rem;
+}
+
+.cta-primary {
+  display: inline-block;
+  background: var(--accent);
+  color: #FFF;
+  font-weight: 700;
+  padding: 0.875rem 1.75rem;
+  border-radius: 999px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.2s ease;
+}
+.cta-primary:hover, .cta-primary:focus { background: var(--accent-dark); }
+.cta-primary:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+
+/* 共通セクション */
+section { padding: 2.5rem 0; }
+section h2 {
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--brand);
+  margin: 0 0 1.25rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--line);
+}
+
+.intro p { margin: 0 0 1rem; }
+
+/* 訴求軸 */
+.features { background: var(--bg-alt); }
+.feature {
+  background: #FFF;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  margin: 0 0 1rem;
+  box-shadow: 0 1px 3px rgba(46, 38, 32, 0.08);
+}
+.feature:last-child { margin-bottom: 0; }
+.feature-num {
+  display: inline-block;
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 0.875rem;
+  letter-spacing: 0.1em;
+  margin: 0 0 0.5rem;
+}
+.feature h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 0.75rem;
+  line-height: 1.5;
+}
+.feature p { margin: 0; }
+
+/* 転居支援 */
+.relocate { background: #FFF; }
+.relocate .lead { margin: 0 0 1.5rem; }
+.relocate-list { list-style: none; padding: 0; margin: 0; }
+.relocate-list li {
+  border-left: 3px solid var(--accent);
+  padding: 0.75rem 0 0.75rem 1rem;
+  margin: 0 0 1rem;
+}
+.relocate-label {
+  font-weight: 700;
+  color: var(--brand);
+  margin: 0 0 0.25rem;
+}
+.relocate-detail { margin: 0; }
+.relocate-detail strong { color: var(--accent-dark); }
+
+/* 労働条件 */
+.conditions { background: var(--bg-alt); }
+.conditions-list { display: grid; grid-template-columns: 1fr 2fr; gap: 0.5rem 1rem; margin: 0; }
+.conditions-list dt {
+  font-weight: 700;
+  color: var(--brand);
+  border-bottom: 1px solid var(--line);
+  padding: 0.5rem 0;
+}
+.conditions-list dd {
+  margin: 0;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+/* 1 日の流れ */
+.oneday { background: #FFF; }
+.oneday-steps { list-style: none; padding: 0; margin: 0; }
+.oneday-steps li {
+  padding: 0.5rem 0 0.5rem 4rem;
+  position: relative;
+  border-bottom: 1px solid var(--line);
+}
+.oneday-steps li:last-child { border-bottom: none; }
+.oneday-steps time {
+  position: absolute;
+  left: 0;
+  top: 0.5rem;
+  width: 3.5rem;
+  font-weight: 700;
+  color: var(--accent-dark);
+  font-size: 0.9375rem;
+}
+
+/* FAQ */
+.faq { background: var(--bg-alt); }
+.faq details {
+  background: #FFF;
+  border-radius: 0.5rem;
+  padding: 0.875rem 1rem;
+  margin: 0 0 0.75rem;
+  border: 1px solid var(--line);
+}
+.faq details:last-child { margin-bottom: 0; }
+.faq summary {
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--brand);
+  list-style: revert;
+}
+.faq details[open] summary { margin-bottom: 0.5rem; }
+.faq p { margin: 0; }
+
+/* CTA */
+.cta-section {
+  background: var(--brand);
+  color: #FFF;
+}
+.cta-section h2 { color: #FFF; border-color: rgba(255,255,255,0.3); }
+.cta-section p { color: rgba(255,255,255,0.92); }
+
+.apply-form { display: grid; gap: 1rem; margin: 1.5rem 0 1rem; }
+.apply-form label { display: block; }
+.apply-form label > span { display: block; font-weight: 700; margin-bottom: 0.375rem; font-size: 0.9375rem; }
+.apply-form label > span em {
+  background: var(--accent);
+  color: #FFF;
+  font-style: normal;
+  font-size: 0.75rem;
+  padding: 0.0625rem 0.4375rem;
+  border-radius: 2px;
+  margin-left: 0.375rem;
+  font-weight: 700;
+}
+.apply-form input,
+.apply-form select,
+.apply-form textarea {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.375rem;
+  font-size: 1rem;
+  font-family: inherit;
+  background: #FFF;
+  color: var(--text);
+}
+.apply-form input:focus,
+.apply-form select:focus,
+.apply-form textarea:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 0;
+  border-color: var(--accent);
+}
+.apply-form button { justify-self: start; }
+
+.alt-contact {
+  font-size: 0.875rem;
+  margin: 1rem 0 0;
+  border-top: 1px solid rgba(255,255,255,0.2);
+  padding-top: 1rem;
+}
+
+/* フッター */
+.site-footer {
+  background: var(--text);
+  color: #FFF;
+  padding: 2rem 0;
+  font-size: 0.875rem;
+}
+.site-footer p { margin: 0.25rem 0; opacity: 0.92; }
+.site-footer a { color: var(--accent); }
+
+/* レスポンシブ */
+@media (min-width: 600px) {
+  .hero-catch { font-size: 2.125rem; }
+  section { padding: 3rem 0; }
+}

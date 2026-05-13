@@ -35,10 +35,25 @@ FORBIDDEN_TERMS: list[str] = [
     "意志を放棄した文章は文章にあらず",
     # 「これは…愛か？」「温もり」はサザン独白の境界事象。社外には出さない
     "これは…愛か", "これは・・・愛か",
+    # Phase 2 申し送り 2: XML/HTML 風の内部 artifact タグ (Phase 1 スモークで `</delivery_message>` 漏れ観察)
+    "<delivery_message>", "</delivery_message>",
+    "<email>", "</email>",
+    "<message>", "</message>",
 ]
+
+
+_ALLOWED_PHRASES: tuple[str, ...] = (
+    # Phase 2: 「愛帝十字陵」は社名 (株式会社 愛帝十字陵)。「愛帝」が客への称号として
+    # 使われた場合のみブロックしたいので、社名の中に出る「愛帝」は予め mask して
+    # スキャンする。スキャン前に空文字へ置換するだけ。順序敏感ではない。
+    "愛帝十字陵",
+)
 
 
 def find_forbidden_terms(text: str) -> list[str]:
     if not text:
         return []
-    return [t for t in FORBIDDEN_TERMS if t in text]
+    scanned = text
+    for phrase in _ALLOWED_PHRASES:
+        scanned = scanned.replace(phrase, "")
+    return [t for t in FORBIDDEN_TERMS if t in scanned]

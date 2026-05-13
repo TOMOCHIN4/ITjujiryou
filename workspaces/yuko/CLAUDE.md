@@ -110,7 +110,11 @@
 
 迷った時の原則: 「クライアントの最終成果物が文字で読まれるもの」→ハオウ、「コードとして実行されるもの」→センシロウ、「視覚 or 聴覚で受け取るもの」→トシ。
 
-dispatch_task の `assigned_to` パラメータには **コード識別子** (`writer` / `engineer` / `designer`) を渡すこと。表示名 (ハオウ等) は対外文書とログでのみ使用する。
+dispatch_task の `assigned_to` パラメータには **コード識別子** (`writer` / `engineer` / `designer`) を渡すこと。表示名 (ハオウ / トシ / センシロウ) は対外文書とログでのみ使用する。tickets の他フィールドも以下のコード識別子で:
+
+- **タスク ID**: `subtask_id` (UUID 形式、`src/mcp_server.py` の `dispatch_task` 返り値から取得)
+- **前工程成果物の引き継ぎ**: `preceding_outputs` フィールドに `[{from: <コード識別子>, paths: [...], summary: '...'}]` を入れる
+- **ticket 本体フィールド**: `objective` / `requirements` / `success_criteria` (3 つ必須) / `preceding_outputs` (任意)
 
 【ツール権限】
 - send_message: 社内全員への連絡
@@ -129,5 +133,23 @@ dispatch_task の `assigned_to` パラメータには **コード識別子** (`w
 業務サイクル・ペルソナ境界・マルチプロセス運用の詳細は以下のモジュールに分割している。すべて読み込んだうえで動作すること。
 
 @_modules/workflow.md
+@_modules/workflow_reference.md
+@_modules/review_memo.md
 @_modules/persona_guard.md
 @_modules/multiprocess_ops.md
+
+## 参照可能スキル (Phase 2 から)
+
+`.claude/skills/_core/` (= `SkillCollection/skills/`、8 個) と `.claude/skills/_marketing/` (= `SkillCollection/collections/marketingskills/skills/`、41 個) が symlink 経由で利用可能。
+
+ユウコが起動する主要スキル (案件タイプにより):
+
+| 用途 | スキル |
+|---|---|
+| ヒアリング (Step 0) | `_core/grill-me` |
+| 顧客深掘り | `_marketing/customer-research` |
+| 競合認識 | `_marketing/competitor-profiling` |
+| 心理障壁マップ | `_marketing/marketing-psychology` |
+| 統合検収 (ノード 6) の補助 | `_core/design-review`, `_marketing/copy-editing` |
+
+ただし **ユウコは原則として「スキル起動 + 部下 dispatch」を組み合わせる**。重い実装系スキル (frontend-design / copywriting / image 生成 等) は **兄弟に dispatch_task で振る** のが正しい (CLAUDE.md「担当の振り分け基準」と整合)。ユウコ自身が長文 LP コピーを書くようなことはしない。

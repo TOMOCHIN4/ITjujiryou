@@ -83,7 +83,9 @@ def _tool_defs() -> list[Tool]:
                 "社内メンバー (souther/yuko/designer/engineer/writer) にメッセージを送る。"
                 "DB に書き込んで即 return する非同期送信。"
                 "応答が必要な場合は consult_souther / consult_peer を使う。"
-                "クライアント宛 (to=client) は禁止 — deliver を使うこと。"
+                "Phase 2 から: ユウコのみ to=client が許可される (message_type='email' のときのみ)。"
+                "これは納品ではなくヒアリング・進捗連絡などの非納品メール用。"
+                "実際の納品 (deliverable_paths を伴う) は deliver を使うこと。"
             ),
             inputSchema={
                 "type": "object",
@@ -164,15 +166,19 @@ def _tool_defs() -> list[Tool]:
             name="propose_plan",
             description=(
                 "ユウコ専用。案件の初期計画を保存する。複合案件・規模中以上で必須。"
-                "plan_json は {steps:[...], risks, milestones} 等。"
+                "推奨: plan_path で `workflows/cases/{案件ID}/final_plan.md` を渡す (D10 ハイブリッド形式)。"
+                "MD ファイルは YAML frontmatter (name/description/case-id/agents/workflows-referenced) + 本文 が必須。"
+                "下位互換のため plan_json (JSON 文字列、{steps:[...], risks, milestones} 等) も受け付ける。"
+                "plan_path と plan_json のいずれか必須。両方ならエラー。"
             ),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "task_id": {"type": "string"},
-                    "plan_json": {"type": "string"},
+                    "plan_path": {"type": "string", "description": "リポジトリルートからの相対パス (推奨)"},
+                    "plan_json": {"type": "string", "description": "下位互換 JSON 文字列"},
                 },
-                "required": ["task_id", "plan_json"],
+                "required": ["task_id"],
             },
         ),
         Tool(
@@ -272,8 +278,15 @@ async def _handle_send_message(args: dict[str, Any]) -> list[TextContent]:
     task_id = args.get("task_id") or None
     message_type = args.get("message_type") or "report"
 
-    if to not in VALID_AGENTS:
-        return _text(f"ERROR: 不正な宛先 '{to}'。有効値: {VALID_AGENTS} (client は deliver を使うこと)")
+    # Phase 2: ユウコのみ to=client + message_type=email が許可 (ヒアリング・進捗連絡用、納品でない)
+    if to == "client":
+        if from_agent != "yuko":
+            return _text(f"ERROR: to=client は yuko 専用です (from='{from_agent}' は不可)")
+        if message_type != "email":
+            return _text(f"ERROR: to=client のときは message_type='email' のみ可 (got '{message_type}')。"
+                         "実際の納品は deliver を使うこと")
+    elif to not in VALID_AGENTS:
+        return _text(f"ERROR: 不正な宛先 '{to}'。有効値: {VALID_AGENTS} (client は yuko の email 用のみ)")
 
     store = get_store()
     msg_id = await store.add_message(from_agent, to, content, message_type, task_id)
@@ -541,17 +554,108 @@ async def _poll_reply(
     return None
 
 
+_PLAN_REQUIRED_FRONTMATTER_KEYS = ("name", "description", "case-id", "agents", "workflows-referenced")
+
+
+def _parse_plan_md_frontmatter(md_text: str) -> tuple[dict[str, Any], str]:
+    """ファイナルプラン MD から YAML frontmatter (dict) と本文を抽出する。
+
+    形式: 先頭 `---` 行 → frontmatter 本体 → 次の `---` 行 → 本文。
+    YAML ライブラリへの依存を避け、最小のパーサ (key: value または key: [list]) を実装。
+    """
+    lines = md_text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        raise ValueError("MD が YAML frontmatter (--- で開始) で始まっていません")
+    body_start = None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            body_start = i + 1
+            break
+    if body_start is None:
+        raise ValueError("YAML frontmatter の閉じ `---` が見つかりません")
+
+    fm_lines = lines[1:body_start - 1]
+    fm: dict[str, Any] = {}
+    current_list_key: str | None = None
+    for raw in fm_lines:
+        line = raw.rstrip()
+        if not line.strip():
+            current_list_key = None
+            continue
+        if line.startswith("  - "):
+            if current_list_key is None:
+                raise ValueError(f"YAML 配列要素の親キーがありません: {line!r}")
+            fm.setdefault(current_list_key, []).append(line[4:].strip())
+            continue
+        if ":" not in line:
+            raise ValueError(f"YAML 行に ':' がありません: {line!r}")
+        key, _, value = line.partition(":")
+        key = key.strip()
+        value = value.strip()
+        if not value:
+            # 次行以降が list 要素 (- xxx) の可能性
+            current_list_key = key
+            fm[key] = []
+        elif value.startswith("[") and value.endswith("]"):
+            # インライン配列 [a, b, c]
+            inner = value[1:-1].strip()
+            fm[key] = [x.strip().strip('"').strip("'") for x in inner.split(",") if x.strip()] if inner else []
+            current_list_key = None
+        else:
+            fm[key] = value
+            current_list_key = None
+
+    body = "\n".join(lines[body_start:]).strip()
+    return fm, body
+
+
 async def _handle_propose_plan(args: dict[str, Any]) -> list[TextContent]:
     task_id = args["task_id"]
-    plan_json = args["plan_json"]
-    try:
-        json.loads(plan_json)
-    except json.JSONDecodeError as e:
-        return _text(f"ERROR: plan_json が不正な JSON: {e}")
-    plan_id = await get_store().add_plan(task_id, plan_json)
+    plan_path = args.get("plan_path")
+    plan_json = args.get("plan_json")
+
+    if plan_path and plan_json:
+        return _text("ERROR: plan_path と plan_json は片方のみ指定してください")
+    if not plan_path and not plan_json:
+        return _text("ERROR: plan_path (推奨) または plan_json のいずれかが必要です")
+
+    if plan_path:
+        # D10 ハイブリッド: MD ファイルから frontmatter を抽出して保存
+        repo_root = Path(__file__).resolve().parents[1]
+        md_path = (repo_root / plan_path).resolve()
+        try:
+            md_path.relative_to(repo_root)  # repo 配下チェック (パストラバーサル防止)
+        except ValueError:
+            return _text(f"ERROR: plan_path はリポジトリ内のパスのみ受け付けます: {plan_path}")
+        if not md_path.exists():
+            return _text(f"ERROR: plan_path が存在しません: {plan_path}")
+        try:
+            md_text = md_path.read_text(encoding="utf-8")
+            fm, body = _parse_plan_md_frontmatter(md_text)
+        except (OSError, ValueError) as e:
+            return _text(f"ERROR: plan MD 読込/パース失敗: {e}")
+        missing = [k for k in _PLAN_REQUIRED_FRONTMATTER_KEYS if k not in fm]
+        if missing:
+            return _text(f"ERROR: frontmatter 必須キー欠落: {missing}")
+        plan_record = {
+            "format": "md-hybrid-v1",
+            "plan_path": plan_path,
+            "frontmatter": fm,
+            "body_preview": body[:200],
+        }
+        plan_json_to_save = json.dumps(plan_record, ensure_ascii=False)
+    else:
+        # 下位互換: 任意 JSON
+        try:
+            json.loads(plan_json)
+        except json.JSONDecodeError as e:
+            return _text(f"ERROR: plan_json が不正な JSON: {e}")
+        plan_json_to_save = plan_json
+
+    plan_id = await get_store().add_plan(task_id, plan_json_to_save)
     await log(
         "yuko",
-        f"propose_plan 保存 (plan_id={plan_id[:8]})",
+        f"propose_plan 保存 (plan_id={plan_id[:8]}, format={'md-hybrid-v1' if plan_path else 'legacy-json'})",
         event_type="plan",
         task_id=task_id,
     )
@@ -673,6 +777,12 @@ async def _handle_read_status(args: dict[str, Any]) -> list[TextContent]:
 async def _handle_deliver(args: dict[str, Any]) -> list[TextContent]:
     task_id = args["task_id"]
     delivery_message = args["delivery_message"]
+    # Phase 2 申し送り 2: XML/HTML 風の内部 artifact タグを送信前に除去する (defense in depth)
+    delivery_message = re.sub(
+        r"</?(?:delivery_message|email|message)>",
+        "",
+        delivery_message,
+    )
     try:
         paths = json.loads(args["deliverable_paths_json"])
     except json.JSONDecodeError as e:

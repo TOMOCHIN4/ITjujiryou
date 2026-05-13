@@ -1,62 +1,52 @@
 # workflows/ — ワークフロー倉庫 (3 階層)
 
-愛帝十字陵 v2 のワークフロー保管庫。設計の全体像は `../aitei_juujiryou_v2_confirmed_decisions.md` §7-8 を参照。
+仕様書 §4.5 / D4 で定義された 3 階層のワークフロー倉庫。Phase 2 で運用開始。
 
-## 階層構成
+## 階層構造
 
 ```
 workflows/
-├── README.md
-├── originals/        # 原本層: Studio 出力 or 人間手書き、改変禁止
-├── cases/            # 案件アレンジ層: 案件ごとのスナップショット、案件中のみ書き換え
-└── distilled/        # 蒸留層: 案件後の昇格版、再利用可
+├── originals/      # 原本: Studio 出力または人間手書き。改変禁止
+├── cases/          # 案件アレンジ: 案件 ID 単位の作業ディレクトリ
+│   └── {案件ID}/
+│       ├── (originals/ から複製した WF 群)
+│       └── final_plan.md  ← D10 ファイナルプラン (YAML frontmatter + 本文)
+└── distilled/      # 蒸留昇格: 案件後の昇格版、再利用可
 ```
 
-### 1. originals (原本層)
+## 各階層の役割と規約
 
-- Studio (将来採用) または人間が手書きで作成した **原本** を配置
-- **改変禁止**。バージョンアップは `recruit-campaign-master` → `recruit-campaign-master-v2` として共存
-- 物理的に readonly 推奨 (`chmod -w workflows/originals/*.md`)
-- Phase 0 Track B で 5 本配置予定:
-  - `recruit-campaign-master.md` (案件全体マクロ)
-  - `landing-page-build.md` (LP の構成→ライティング→デザイン→実装)
-  - `print-collateral-build.md` (パンフ/ポスター制作)
-  - `recruit-copywriting.md` (求人特化コピーライティング)
-  - `brand-consistency-check.md` (複数納品物間のトーン統一)
+### originals/ (改変禁止)
 
-### 2. cases (案件アレンジ層)
+- **何を置くか**: Workflow Studio エクスポート、または人間が手書きした **原本**
+- **改変可否**: **改変禁止**。バージョンアップは `v3` → `v4` のように別ファイルとして共存
+- **削除条件**: 90 日無参照で削除候補
+- **現状の収納物 (Phase 0 配置)**: `recruit-campaign-master.md`, `landing-page-build.md`, `print-collateral-build.md`, `recruit-copywriting.md`, `brand-consistency-check.md`
 
-- 案件ごとに `cases/<case-id>/` ディレクトリを作る (case-id 命名規約は §19 で確定)
-- 原本をベースに本案件用にアレンジしたものを配置
-- **案件中のみ書き換え可**、案件完了後は freeze
-- 90 日経過でアーカイブ領域へ移動 (物理削除はしない、Phase 5 で運用化)
+### cases/{案件ID}/ (案件中のみ書き換え可)
 
-### 3. distilled (蒸留層)
+- **何を置くか**: 案件ごとのアレンジ済 WF、`final_plan.md`、その他案件スナップショット
+- **改変可否**: **案件中のみ書き換え可**。納品後は読み取り専用
+- **アーカイブ**: 90 日無更新で `cases/_archive/{案件ID}/` へ移動 (Phase 5 で `scripts/archive_cases.py` を整備)
+- **詳細**: `cases/README.md` 参照
 
-- 案件完了時の整理 HOOK で各兄弟が「再利用価値あり」と判定した 1 本のみ昇格提案
-- ユウコ統合セッションが承認したもののみ昇格
-- **昇格規律 (Phase 5 で実装)**:
-  - 1 案件 1 兄弟あたり最大 1 本まで昇格可
-  - 同じ原本から派生した蒸留は 3 本まで。4 本目を作る時は 1 本退役
-  - 退役は物理削除せず `distilled/_retired/` へ移動
-- 昇格台帳: `distilled/_promotion_log.md` で案件 ID / 兄弟 / 原本派生数を追跡
+### distilled/ (昇格時のみ書き込み)
 
-## ファイル形式
+- **何を置くか**: 案件後の整理 HOOK でユウコが承認した「再利用価値あり」 WF
+- **昇格規律**: 1 案件 1 兄弟あたり **最大 1 本**、同原本派生 **3 本上限**、4 本目作成時は 1 本退役
+- **詳細**: `distilled/README.md` 参照
 
-- **Claude Code ネイティブ MD + YAML frontmatter** 形式
-- CC Workflow Studio (将来採用候補) のエクスポート形式と互換
-- 独自スキーマは発明しない
-- 具体的な frontmatter フィールドの確定は **次セッションの宿題 (§19)**
+## ユウコ業務サイクルとの接続
 
-## 指示粒度との関係
+ユウコの `_modules/workflow.md` Step 0 (ヒアリング) / Step A (初期計画) で本ディレクトリを参照する。具体的な利用パスは ユウコ `_modules/workflow_reference.md` (案件タイプ別マッピング) に集約済。
 
-ユウコから兄弟への指示は **「ワークフロー名 + どこをどう改変するか」** で統一する (§6)。
+## 案件 ID 命名規約
 
-例:
-> `build-feature-v3` をベースに、ステップ4の `integration-test` を本案件の API 仕様に合わせて差し替え。ステップ 7 はスキップ可。
+`YYYY-MM-DD-{client-slug}` 形式。slug は半角英小文字とハイフン (例: `2026-05-13-kataoka-dental`)。仕様書 §10 で正式化が未確定だが、Phase 2 以降は暫定形を採用。詳細は `cases/README.md`。
 
-skill 名指定はしない (兄弟がワークフロー実行時に選ぶ)。
+## アンチパターン (やってはいけないこと)
 
-## Claude Code 進化への自動追従
-
-スラッシュコマンド / subagent / skill の仕様が拡張されれば、原本層もそのまま恩恵を受ける。Studio が新機能を吐けばそれも自動的に使える状態を維持。
+- `originals/` を直接編集 (改変禁止)
+- `distilled/` への昇格規律 (1 案件 1 兄弟 1 本、3 本上限) を破る
+- 案件 ID 命名規約から逸脱した名前で `cases/` 配下に書く
+- `final_plan.md` を `cases/{案件ID}/` の外に書く (D10 形式違反)

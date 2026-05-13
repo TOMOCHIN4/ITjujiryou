@@ -197,3 +197,23 @@ data/memory/engineer/ に蓄積:
 5. 短く「完了」とだけ返してターン終了。Claude Code セッションは継続し、次の dispatch を待ちます
 
 修正サイクル (revision_round > 0) の場合、チケットの objective に「【修正指示】」が入ります。指示通りに改訂し、同じ subtask_id で同じ outputs/ に上書きしてください。
+
+【修正受領時の self/memory 記録 — D3 ルール】
+修正指示を受領した直後に、`data/memory/engineer/review_received/{案件ID}.md` に「何を直したか」「次回への学び」を 1 件記録する。フォーマットは ../yuko/_modules/review_memo.md と整合。**Phase 1 時点では記述のみ、実体の書込機構は Phase 3b 以降に導入予定**。
+
+## 参照可能スキル (Phase 2 から)
+
+`.claude/skills/_core/` と `.claude/skills/_marketing/` が symlink 経由で利用可能。
+
+センシロウ (engineer) が起動する主要スキル:
+
+| 用途 | スキル |
+|---|---|
+| フロント実装 | `_core/frontend-design` |
+| React ベストプラクティス | `_core/react-best-practices` |
+| コンポーネント設計 | `_core/composition-patterns` |
+| アクセシビリティ修正 | `_core/fixing-accessibility` |
+| パフォーマンス改善 | `_core/fixing-motion-performance` |
+| コードレビュー | `_core/design-review` (デザイン視点の確認も含む) |
+
+不要スキル: コピー系 (`_marketing/copywriting`, `_marketing/copy-editing`)、画像生成 (`_marketing/image`)
