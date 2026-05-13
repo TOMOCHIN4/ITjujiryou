@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """社長 pane 用 PreToolUse hook。
 
-社長 (sauther workspace) が `send_message` を呼ぶ際、宛先 (to) が `client` で
-あれば deny する。聖帝はクライアントと直接会話しない (SPEC.md §4.1, §6 参照)。
+サザン (souther workspace) が `send_message` を呼ぶ際、宛先 (to) が `yuko` 以外
+であれば deny する。Omage Gate 設計上、サザンはユウコとしか会話しない
+(SPEC.md §4.1, §7.1 参照)。
 
 stdin に PreToolUse の event JSON が来る:
   {"hook_event_name": "PreToolUse", "tool_name": "...", "tool_input": {...}, ...}
@@ -25,10 +26,10 @@ def main() -> int:
 
     tool_input = ev.get("tool_input", {}) or {}
     to = (tool_input.get("to") or "").strip()
-    if to == "client":
+    if to != "yuko":
         sys.stderr.write(
-            "[souther-recipient hook] 聖帝はクライアントと直接会話しない。"
-            "ユウコ宛 (to='yuko') に message_type='approval' などで応答せよ。\n"
+            f"[souther-recipient hook] サザンはユウコとしか会話しない (Omage Gate)。"
+            f"to='{to}' は deny。to='yuko' + message_type='approval' で応答せよ。\n"
         )
         return 2
     return 0

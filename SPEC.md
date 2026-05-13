@@ -240,6 +240,8 @@ tests/
 **原因**: ツール権限が広すぎる。
 **対策**: 社長の `.claude/settings.json` で Bash/Edit/Write/MultiEdit/WebSearch/WebFetch/dispatch_task/deliver/evaluate_deliverable/propose_plan/consult_peer/consult_souther を **すべて `permissions.deny`**。これでコード側に物理的に強制される。テストは `tests/test_president_no_tools.py`。
 
+**発言制御 (Omage Gate)**: サザンの返答は `scripts/hooks/inject_souther_mode.py` の UserPromptSubmit hook が Python ガードレールで制御する。報告受信 → 27 quote (`workspaces/souther/_modules/quotes.md`) から cooldown 付きで 3 つ抽選 → Claude が 3 オマージュを内部構築 → 最もサウザーらしい 1 案を `send_message(to="yuko", message_type="approval")` で送信、という流れ。プロンプト中心制御では発言ブレが抑えられないため、Python ロジック側で語彙集合を絞る方式に移行 (2026-05-13 設計)。サザンは `check_souther_recipient.py` PreToolUse hook で **yuko 宛以外への送信を物理 deny** されている。
+
 ### 7.2 ペルソナ混線
 
 **症状**: クライアント宛応答に「聖帝」「サウザー」「下郎」「ふん、」等の事務所内ペルソナ用語が漏れる。

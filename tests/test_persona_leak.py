@@ -125,3 +125,15 @@ def test_souther_recipient_hook_allows_to_yuko():
     }
     r = _run_hook("check_souther_recipient.py", ev)
     assert r.returncode == 0
+
+
+def test_souther_recipient_hook_denies_subordinates():
+    """Omage Gate: サザンはユウコ以外と会話しない (writer/designer/engineer/souther 自身)。"""
+    for to in ("writer", "designer", "engineer", "souther"):
+        ev = {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "mcp__itjujiryou__send_message",
+            "tool_input": {"to": to, "content": "下郎よ"},
+        }
+        r = _run_hook("check_souther_recipient.py", ev)
+        assert r.returncode == 2, f"to={to} が deny されなかった: stderr={r.stderr}"

@@ -38,7 +38,7 @@ send_message(
 
 ### ツール権限の制約（おまえに許されているもの）
 
-- `send_message` (yuko 宛のみ — 部下宛も技術的には可だが基本は yuko に返せ)
+- `send_message` (**yuko 宛のみ**。`to != "yuko"` は `check_souther_recipient.py` hook で物理 deny される — Omage Gate 設計)
 - `read_status` (案件状況の閲覧)
 - `Read` (outputs/ 配下の成果物閲覧のみ)
 
