@@ -24,8 +24,9 @@ import shutil
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Optional
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
@@ -33,6 +34,28 @@ sys.path.insert(0, str(REPO_ROOT))
 from src.memory.store import get_store  # noqa: E402
 
 POLL_INTERVAL = float(os.environ.get("ITJ_WATCHER_POLL_INTERVAL", "1.0"))
+
+# --- curator scheduler 設定 (PLAN.md「サザン二重構造 未配線 3 operation」対応) ---
+# cron-based 発火 (cross_review / archive_judge) の周期と検査間隔を環境変数で上書き可。
+CROSS_REVIEW_INTERVAL_DAYS = int(os.environ.get("ITJ_CROSS_REVIEW_INTERVAL_DAYS", "30"))
+ARCHIVE_JUDGE_INTERVAL_DAYS = int(os.environ.get("ITJ_ARCHIVE_JUDGE_INTERVAL_DAYS", "90"))
+SCHEDULE_CHECK_INTERVAL_SEC = int(
+    os.environ.get("ITJ_CURATOR_SCHEDULE_CHECK_INTERVAL_SEC", "3600")
+)
+
+# cross_review の検査対象 category (data/memory/company/{category}/)
+CROSS_REVIEW_CATEGORIES = [
+    "client_profile",
+    "quality_bar",
+    "workflow_rule",
+    "recurring_pattern",
+]
+# archive_judge の検査対象 role (data/memory/{role}/_scratch/)
+ARCHIVE_JUDGE_ROLES = ["writer", "designer", "engineer", "yuko"]
+
+CURATOR_SCHEDULE_PATH = (
+    REPO_ROOT / "data" / "memory" / "company" / "_curator_schedule.json"
+)
 
 PANE_MAP = {
     "souther": os.environ.get("ITJ_PANE_SOUTHER", "itj:office.0"),
@@ -177,6 +200,157 @@ def _company_target_path(category: str, slug: str) -> Path:
     )
 
 
+# ---------------------------------------------------------------------------
+# curator スケジューラ (PLAN.md「サザン二重構造 4 op 中の未配線 3 つ」対応)
+#   - cross_review:  watcher 内蔵 cron で N 日経過した company/{category}/ に対し発火
+#   - archive_judge: watcher 内蔵 cron で N 日経過した {role}/_scratch/ に対し発火
+#   - client_profile_maintenance: ユウコ手動トリガー (workflow.md に作法あり、ここでは扱わない)
+#
+# どの cron 発火も `curator_trigger` メッセージを yuko に投入し、
+# 既存 `curator_request` 経路 (yuko → souther backstage → memory-curator subagent) へ
+# 接続する。yuko 側 workflow.md がトリガーを受領→ consult_souther でブリッジする。
+# ---------------------------------------------------------------------------
+
+
+def _load_curator_schedule() -> dict:
+    """`_curator_schedule.json` を読む。存在しない/破損時は空 dict。"""
+    if not CURATOR_SCHEDULE_PATH.exists():
+        return {}
+    try:
+        return json.loads(CURATOR_SCHEDULE_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _save_curator_schedule(state: dict) -> None:
+    CURATOR_SCHEDULE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CURATOR_SCHEDULE_PATH.write_text(
+        json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def _parse_iso_dt(s: Optional[str]) -> Optional[datetime]:
+    if not s:
+        return None
+    try:
+        dt = datetime.fromisoformat(s)
+    except (TypeError, ValueError):
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def select_overdue_target(
+    state_section: dict,
+    candidates: list[str],
+    interval_days: int,
+    now: datetime,
+) -> Optional[str]:
+    """state_section[name] = last_run_iso の dict から、interval_days 以上経過した
+    候補のうち最古を返す。一度も走っていない (None / 不正) ものは最優先扱い。"""
+    overdue: list[tuple[str, datetime]] = []
+    epoch = datetime.min.replace(tzinfo=timezone.utc)
+    for name in candidates:
+        last = _parse_iso_dt(state_section.get(name))
+        if last is None:
+            overdue.append((name, epoch))
+            continue
+        if (now - last) >= timedelta(days=interval_days):
+            overdue.append((name, last))
+    if not overdue:
+        return None
+    overdue.sort(key=lambda x: x[1])
+    return overdue[0][0]
+
+
+def build_curator_trigger_content(
+    operation: str, case_id: str, params: dict
+) -> str:
+    """yuko に投入する curator_trigger 本文を整形。yuko 側がパースして
+    consult_souther(curator_request, refs=...) を組み立てる。"""
+    lines = [
+        "[curator_trigger]",
+        f"operation={operation}",
+        f"case_id={case_id}",
+    ]
+    for k, v in params.items():
+        lines.append(f"{k}={v}")
+    lines.append("")
+    lines.append(
+        "上記 operation で memory-curator subagent をサザンへ依頼してください "
+        "(consult_souther message_type=curator_request, refs={operation, "
+        "case_id, ...}) 。詳細は workflow.md §「curator_trigger 受領時」参照。"
+    )
+    return "\n".join(lines)
+
+
+async def maybe_fire_scheduled_curator_triggers(
+    store, now: Optional[datetime] = None
+) -> list[dict]:
+    """schedule.json を読み、cross_review / archive_judge で interval を超えた
+    最古 target に対し `curator_trigger` を yuko に 1 件投入する (op ごとに 1 件)。
+
+    返り値: 発火したトリガーの dict のリスト (テスト用 / ログ出力用)。
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+    state = _load_curator_schedule()
+    fired: list[dict] = []
+    today_date = now.strftime("%Y-%m-%d")
+
+    # --- cross_review: 最古の overdue category を 1 件 ---
+    cross_state = state.setdefault("cross_review", {})
+    target_cat = select_overdue_target(
+        cross_state, CROSS_REVIEW_CATEGORIES, CROSS_REVIEW_INTERVAL_DAYS, now
+    )
+    if target_cat:
+        case_id = f"cross-review-{target_cat}-{today_date}"
+        content = build_curator_trigger_content(
+            "cross_review", case_id, {"target_category": target_cat}
+        )
+        await store.add_message(
+            from_agent="system",
+            to_agent="yuko",
+            content=content,
+            message_type="curator_trigger",
+            task_id=case_id,
+        )
+        cross_state[target_cat] = now.isoformat()
+        fired.append(
+            {"operation": "cross_review", "target": target_cat, "case_id": case_id}
+        )
+
+    # --- archive_judge: 最古の overdue role を 1 件 ---
+    archive_state = state.setdefault("archive_judge", {})
+    target_role = select_overdue_target(
+        archive_state, ARCHIVE_JUDGE_ROLES, ARCHIVE_JUDGE_INTERVAL_DAYS, now
+    )
+    if target_role:
+        cutoff_iso = (now - timedelta(days=ARCHIVE_JUDGE_INTERVAL_DAYS)).isoformat()
+        case_id = f"archive-judge-{target_role}-{today_date}"
+        content = build_curator_trigger_content(
+            "archive_judge",
+            case_id,
+            {"target_role": target_role, "cutoff_iso": cutoff_iso},
+        )
+        await store.add_message(
+            from_agent="system",
+            to_agent="yuko",
+            content=content,
+            message_type="curator_trigger",
+            task_id=case_id,
+        )
+        archive_state[target_role] = now.isoformat()
+        fired.append(
+            {"operation": "archive_judge", "target": target_role, "case_id": case_id}
+        )
+
+    if fired:
+        _save_curator_schedule(state)
+    return fired
+
+
 async def process_memory_approval(msg: dict) -> dict:
     """sazan → yuko の memory_approval を受領して会社記憶を物理反映する。
 
@@ -298,6 +472,8 @@ async def main() -> None:
     print(
         f"[watcher] start. poll={POLL_INTERVAL}s pane_map={ {k:v for k,v in PANE_MAP.items() if v} }"
     )
+    # curator scheduler の前回チェック monotonic ts (起動時は 0 = 初回 iter で実行)
+    last_schedule_check_mono: float = 0.0
     while True:
         t0 = time.monotonic()
         try:
@@ -374,6 +550,22 @@ async def main() -> None:
                     f"[watcher] post_deliver -> {role:<8s} event={ev['id']} task={task_id[:8]}"
                 )
             await store.mark_event_processed(int(ev["id"]))
+
+        # --- curator scheduler (SCHEDULE_CHECK_INTERVAL_SEC 毎、起動直後は即発火) ---
+        if (
+            last_schedule_check_mono == 0.0
+            or time.monotonic() - last_schedule_check_mono >= SCHEDULE_CHECK_INTERVAL_SEC
+        ):
+            try:
+                fired = await maybe_fire_scheduled_curator_triggers(store)
+                for f in fired:
+                    print(
+                        f"[watcher] curator scheduler fired: op={f['operation']} "
+                        f"target={f['target']} case_id={f['case_id']}"
+                    )
+            except Exception as e:  # noqa: BLE001
+                print(f"[watcher] curator scheduler error: {e}", file=sys.stderr)
+            last_schedule_check_mono = time.monotonic()
 
         elapsed = time.monotonic() - t0
         await asyncio.sleep(max(0.0, POLL_INTERVAL - elapsed))

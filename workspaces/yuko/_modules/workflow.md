@@ -78,6 +78,84 @@ revise の場合、同じ subtask に対し再 dispatch_task。ticket の object
 2. 自分の個人記憶 (`client_handling/`, `persona_translation/`, `routing_decisions/`) に昇格すべき知見があれば該当 topic のファイルへ追記 / 新規作成
 3. 会社記憶 (`data/memory/company/`) に昇格すべき知見があれば `data/memory/yuko/_proposals/{case_id}.md` を Write
 
+### システムからの `curator_trigger` を受領したら (cron 自動発火)
+
+watcher が cron-based に発火するシステムメッセージです。発火源は `scripts/inbox_watcher.py` の `maybe_fire_scheduled_curator_triggers` で、`from=system, to=yuko, message_type=curator_trigger` の形で届きます。
+
+#### 本文フォーマット
+
+```
+[curator_trigger]
+operation=<cross_review|archive_judge>
+case_id=<合成 case_id>
+target_category=<...>      # operation=cross_review のみ
+target_role=<...>          # operation=archive_judge のみ
+cutoff_iso=<ISO8601>       # operation=archive_judge のみ
+
+(末尾に「consult_souther 経由でサザンに依頼してください」の指示文)
+```
+
+#### あなたの作業
+
+あなたは本文を **パース** し、適切な `refs` を組み立てて、サザンへ `curator_request` を投げてください。**自前で curator subagent を呼んではいけません** (subagent 起動はサザン側の作法)。
+
+例: `cross_review` 受領時
+
+```
+consult_souther(
+  from_agent="yuko",
+  task_id="cross-review-client_profile-2026-05-15",
+  message_type="curator_request",
+  content="cross_review 依頼。target_category=client_profile",
+  refs={
+    "operation": "cross_review",
+    "case_id": "cross-review-client_profile-2026-05-15",
+    "target_category": "client_profile",
+  }
+)
+```
+
+例: `archive_judge` 受領時
+
+```
+consult_souther(
+  from_agent="yuko",
+  task_id="archive-judge-writer-2026-05-15",
+  message_type="curator_request",
+  content="archive_judge 依頼。target_role=writer, cutoff_iso=...",
+  refs={
+    "operation": "archive_judge",
+    "case_id": "archive-judge-writer-2026-05-15",
+    "target_role": "writer",
+    "cutoff_iso": "2026-02-14T00:00:00+00:00",
+  }
+)
+```
+
+curator_trigger は watcher の裏側自動発火なので、`record_thought` は不要 (UI 露出を避ける)。短く「curator_trigger を サザン に転送」とだけログに残るような事務的な処理にとどめてください。
+
+### クライアント別案件が溜まったら (手動 `client_profile_maintenance` トリガー)
+
+ある同一クライアントの案件を 5 件程度こなしたあたりで、あなたの判断で client_profile を整理してもよい場合は、自発的にサザンへ依頼を投げます。watcher の自動発火は **しない** (現状 schema に client_id カラムが無いため自動カウント不可、solo-use なのでこれで十分)。
+
+合成 case_id は `client-profile-{client_slug}-{YYYY-MM-DD}` 形式で統一すること:
+
+```
+consult_souther(
+  from_agent="yuko",
+  task_id="client-profile-acme-2026-05-15",
+  message_type="curator_request",
+  content="client_profile_maintenance 依頼。client_id=acme",
+  refs={
+    "operation": "client_profile_maintenance",
+    "case_id": "client-profile-acme-2026-05-15",
+    "client_id": "acme",
+  }
+)
+```
+
+このトリガーは手動なので、`record_thought` で「クライアント A の整理を依頼」のように軽く独白を残してから投げてもよい (UI に出てもよい行為)。
+
 ### 兄弟からの `memory_proposal` を受領したら (二重構造: 裏 → 表)
 
 兄弟が `_proposals/{case_id}.md` を作って `send_message(message_type="memory_proposal")` で通知してきます。受領したら **統合フェーズはサザンへ移譲** します (サザン二重構造の裏側 = memory-curator subagent が代行)。あなた自身は統合せず、依頼を投げるだけです:
@@ -103,10 +181,21 @@ consult_souther(
 
 ### サザンからの `curator_response` 応答 (裏側完了通知)
 
-サザン裏側 (memory-curator subagent) が proposed path を作って `send_message(message_type="curator_response", refs={"proposal_path": "...", "operation": "..."})` で返してきます。受領したら:
+サザン裏側 (memory-curator subagent) が proposed path を作って `send_message(message_type="curator_response", refs={"proposal_path": "...", "operation": "..."})` で返してきます。**`refs["operation"]` で分岐** が必要です:
+
+#### 分岐表
+
+| operation | curator_response 後の処理 | 理由 |
+|---|---|---|
+| `integrate_proposal` | memory_approval_request へ続行 | 新しい会社記憶エントリを生むため、サザン儀礼承認 → watcher 物理反映が必要 |
+| `cross_review` | memory_approval_request へ続行 | 統合本文を会社記憶へ反映 (archive_candidates は将来 batch で処理) |
+| `client_profile_maintenance` | memory_approval_request へ続行 | client_profile/{client_id}.md を更新するため反映必要 |
+| `archive_judge` | **ここで終了** (memory_approval せず) | 候補リストは将来の tar.gz バッチ入力。物理反映 (= 会社記憶への移送) は発生しない |
+
+#### `archive_judge` 以外の場合 (儀礼承認フローへ接続)
 
 1. (任意) `refs["proposal_path"]` (= `data/memory/company/_proposals/{case_id}.md`) を Read で確認。サザン裏側を信頼して skip してもよい
-2. **儀礼承認フローへ接続** — 改めて社長へ表側の上申を投げる:
+2. 改めて社長へ表側の上申を投げる:
 
 ```
 consult_souther(
@@ -118,6 +207,17 @@ consult_souther(
 ```
 
 ここから先は従来通り。サザンの表側 (Omage Gate 経由) で聖帝口調の `memory_approval` が返ってきます。
+
+#### `archive_judge` の場合 (memory_approval せず終了)
+
+archive_judge のアウトプットは「90 日以上経過した `_scratch/{case_id}/` のアーカイブ候補リスト」です。これは将来の tar.gz 化バッチ (PLAN.md「[将来] §7 アーカイブ運用」) の入力で、会社記憶へ反映する性質のものではありません。
+
+curator_response 受領後の作法:
+
+1. (任意) proposal を Read してざっと確認 (件数が多すぎる/少なすぎる等の異常検知のみ)
+2. `record_thought` で軽く独白 (例: 「writer の _scratch、12 件のアーカイブ候補あり。tar.gz batch 待ち」) — UI に出る
+3. これでターン終了。`_proposals/{case_id}.md` はそのまま残し、tar.gz batch が拾うのを待つ
+4. **memory_approval_request は投げない**
 
 ### サザンからの `memory_approval` 応答
 
@@ -131,13 +231,19 @@ consult_souther(
 
 ### 二重構造の整理
 
-| 段階 | message_type | サザン側のモード | 出力 |
-|---|---|---|---|
-| 1. 統合依頼 | `curator_request` | 裏 (silent, omage skip) | curator subagent が _proposals/ に Write |
-| 2. 統合完了通知 | `curator_response` | 裏 (silent) | 1 文の事務的応答 |
-| 3. 儀礼上申 | `memory_approval_request` | 表 (Omage Gate 発火) | 聖帝口調の memory_approval |
-| 4. watcher 反映 | `memory_approval` | (自動) | company/{category}/ に物理反映 |
-| 5. 完了通知 | `memory_finalized` | (自動) | ユウコへ通知 |
+| 段階 | message_type | from → to | サザン側のモード | 出力 |
+|---|---|---|---|---|
+| 0a. cron 自動発火 | `curator_trigger` | system → yuko | (該当なし) | yuko に「サザンへ転送せよ」と通知 (cross_review/archive_judge のみ) |
+| 0b. 手動発火 | (なし) | (yuko 内部判断) | (該当なし) | yuko が自発的に `curator_request` を組み立てる (integrate_proposal / client_profile_maintenance) |
+| 1. 統合依頼 | `curator_request` | yuko → souther | 裏 (silent, omage skip) | curator subagent が _proposals/{case_id}.md に Write |
+| 2. 統合完了通知 | `curator_response` | souther → yuko | 裏 (silent) | 1 文の事務的応答 |
+| 3. 儀礼上申 | `memory_approval_request` | yuko → souther | 表 (Omage Gate 発火) | 聖帝口調の memory_approval |
+| 4. watcher 反映 | `memory_approval` | souther → yuko | (自動) | company/{category}/ に物理反映 |
+| 5. 完了通知 | `memory_finalized` | system → yuko | (自動) | ユウコへ通知 |
+
+**operation 別の終端**:
+- `integrate_proposal` / `cross_review` / `client_profile_maintenance` → 段階 5 まで全て通る
+- `archive_judge` → 段階 2 で **打ち切り** (memory_approval せず、proposal は tar.gz batch を待つ)
 
 ### memory 活用 — 検索は subagent 経由
 

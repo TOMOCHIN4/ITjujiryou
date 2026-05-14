@@ -33,16 +33,6 @@ UI E2E + verify-003 シリーズで取得したログを最初から最後まで
 
 **起点**: `data/logs/dev/2026-05-15_auto_mode_e2e/messages.csv` で時系列を把握 → 興味ある段階の該当 jsonl を Read で深掘り、対応する pane txt と突き合わせ。
 
-### [次セッション] サザン二重構造 4 operation のうち未配線 3 つ
-
-本セッション (2026-05-14) で `integrate_proposal` operation の発火経路 + workflow / hooks / watcher / subagent / settings は完成し、verify-003 v7 で全 8 段階を workaround 無しで通過確認済。残るのは 3 つの未配線 operation のトリガー設計:
-
-a. **`cross_review`** — company/{category}/ 横断レビュー、矛盾検出。発火タイミング案: 月次 cron / 100 案件 deliver ごと
-b. **`archive_judge`** — 90 日経過 `_scratch/` のアーカイブ候補判定、下の §7 アーカイブ運用と統合。発火タイミング案: 90 日 cron
-c. **`client_profile_maintenance`** — クライアント別案件 N 件溜まったらユウコが手動 or 自動上申
-
-memory-curator.md §3 で 4 operation の subagent 側 handler は既に配置済 (`{case_id}.md` 厳命化済)、必要なのはユウコ側のトリガー経路。
-
 ### [次セッション or 将来] subagent Write glob 公式 fix の追跡
 
 `workspaces/souther/.claude/settings.json` の Write allow は現状 bare `Write` (verify-003 で limited glob が subagent 継承時の path normalization 不整合で auto-deny されることを確認、Anthropic fix 待ち)。Claude Code の release notes に subagent permission inheritance 修正が出たら limited glob `Write(//.../company/_proposals/**)` に復帰検討。
