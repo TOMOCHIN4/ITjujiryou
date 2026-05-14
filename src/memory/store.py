@@ -72,6 +72,7 @@ class Store:
                 await db.execute(f"ALTER TABLE {table} DROP COLUMN {column}")
 
         await add_if_missing("events", "parent_event_id", "parent_event_id INTEGER")
+        await add_if_missing("events", "processed_at", "processed_at TEXT")
         await add_if_missing("messages", "delivered_at", "delivered_at TEXT")
         # 旧 10軸採点ルーブリック (検閲官オウガイ) の廃止に伴う列削除
         await drop_if_present("revisions", "scores")
@@ -404,6 +405,39 @@ class Store:
             event_id = cur.lastrowid
             await db.commit()
             return int(event_id) if event_id is not None else 0
+
+    # --- 記憶システム連携 (post_deliver_trigger, memory_approval) ---
+    async def fetch_unprocessed_events(
+        self, event_type: str
+    ) -> list[dict[str, Any]]:
+        """指定 event_type で processed_at が NULL の events を id 昇順で返す。
+        記憶整理フロー (post_deliver_trigger) で使用する。"""
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                "SELECT id, timestamp, agent, event_type, task_id, details "
+                "FROM events WHERE event_type=? AND processed_at IS NULL "
+                "ORDER BY id ASC",
+                (event_type,),
+            )
+            rows = await cur.fetchall()
+        out: list[dict[str, Any]] = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["details"] = json.loads(d["details"]) if d["details"] else {}
+            except json.JSONDecodeError:
+                d["details"] = {"raw": d["details"]}
+            out.append(d)
+        return out
+
+    async def mark_event_processed(self, event_id: int) -> None:
+        async with self._connect() as db:
+            await db.execute(
+                "UPDATE events SET processed_at=? WHERE id=?",
+                (_now(), int(event_id)),
+            )
+            await db.commit()
 
     # --- inbox-watcher 連携 ---
     async def fetch_undelivered_messages(self) -> list[dict[str, Any]]:

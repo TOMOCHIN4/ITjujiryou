@@ -6,11 +6,12 @@
       "mcp__itjujiryou__read_status",
       "mcp__itjujiryou__update_status",
       "mcp__itjujiryou__consult_peer",
+      "Task",
       "Read",
-      "Write(${CLAUDE_PROJECT_DIR}/../../outputs/**)",
-      "Edit(${CLAUDE_PROJECT_DIR}/../../outputs/**)",
-      "Write(${CLAUDE_PROJECT_DIR}/../../data/memory/engineer/**)",
-      "Edit(${CLAUDE_PROJECT_DIR}/../../data/memory/engineer/**)",
+      "Write(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/outputs/**)",
+      "Edit(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/outputs/**)",
+      "Write(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/engineer/**)",
+      "Edit(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/engineer/**)",
       "WebSearch",
       "WebFetch",
       "Bash(python:*)",
@@ -57,7 +58,11 @@
       "Bash(git reset:*)",
       "Bash(git rebase:*)",
       "Bash(curl:*)",
-      "Bash(wget:*)"
+      "Bash(wget:*)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/writer/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/designer/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/yuko/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/souther/**)"
     ]
   },
   "model": "claude-opus-4-7"

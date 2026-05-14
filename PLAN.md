@@ -7,18 +7,29 @@
 
 ## 未着手 TODO
 
-### [次セッション] 記憶・経験積み上げシステム
+### [優先] dontAsk モード切替 (物理ブロック復活)
 
-5 キャラ (サザン / ユウコ / ハオウ / トシ / センシロウ) が案件を重ねるたびに経験・気づき・修正パターン・クライアント反応を**構造化ファイル**として蓄積し、それを **検索/読込/書込/整理を担う subagent** が運用する。
+`scripts/start_office.sh:41` の `claude --dangerously-skip-permissions` を `claude --permission-mode dontAsk` に置換する。
 
-肝になる要素 (ユーザー発):
-1. **構造化されたファイル**: 記憶・経験を記録する場所
-2. **subagent**: 検索/読込/書込/整理を担う
+**Why**: bypass モードでは settings.json の `permissions.deny` / `permissions.allow` が全 skip される (公式 [permission-modes.md](https://code.claude.com/docs/en/permission-modes) で確認、2026-05-14)。サウザー化防止 (SPEC.md §7.1) や記憶アクセスガード (§10.1) の物理ブロックが本番では効いておらず、実質ガードは hook 経路のみ。dontAsk モードなら allow に書かれたツール + read-only Bash のみ実行可で、自律駆動 (tmux 監視ゼロ) と物理ブロックを両立できる。
+
+着手前に必ず読む:
+- memory: `project_permission_dontask_proposal.md` (切替手順 + 事前チェック項目)
+- memory: `feedback_bypass_permissions_pitfall.md` (現状の問題)
+- memory: `feedback_permissions_caution.md` (パーミッション変更は実機検証必須)
+
+実機検証必須: 案件 1 件を流して allow リスト不足で auto-deny が出ないか確認、各 hook が引き続き動くか確認。
+
+### [将来] 記憶システム §7 アーカイブ運用
+
+90 日経過した `data/memory/{role}/_scratch/{case_id}/` を `data/memory/{role}/_archive/{case_id}.tar.gz` に圧縮するバッチを設計・実装する。
+
+肝になる要素:
+- 「使われなくなった ≠ 不要」 → 物理削除せずアーカイブ
+- 検索 subagent の通常検索範囲からは外し、検索ノイズを下げる
+- 復活可能性は残す (tar.gz から個別 case_id を取り出せる経路)
 
 着手前に読む:
-- `~/.claude/projects/-Users-tomohiro-Desktop-ClaudeCode-ITjujiryou/memory/project_next_session_memory_system.md` (設計骨子・既存サンプル・論点)
-- `~/.claude/projects/-Users-tomohiro-Desktop-ClaudeCode-ITjujiryou/memory/feedback_python_guardrail_pattern.md` (Omage Gate で実証した再利用テンプレ)
-- `data/memory/{role}/*/*.md` (既存の構造化記憶サンプル 4 件、フォーマット先行例)
-- `SPEC.md` §5 (ディレクトリ構成、`data/memory/` 予約) と §9 (将来拡張)
-
-詳細論点 (subagent をどこに置くか、書込トリガ、構造化フォーマット等) は memory の `project_next_session_memory_system.md` を参照。
+- `SPEC.md §10` (記憶システム本体)
+- `data/memory/README.md`
+- 目的書 §7 (本目的書は 2026-05-14 セッションで実装プラン `~/.claude/plans/v2-serene-marble.md` に反映済、§1-6 は完了)

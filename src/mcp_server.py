@@ -697,6 +697,16 @@ async def _handle_deliver(args: dict[str, Any]) -> list[TextContent]:
             "deliverable_count": len(paths),
         },
     )
+    # SPEC.md §10.2 記憶整理トリガ — inbox_watcher が拾って各 pane に scratch 整理プロンプトを投入
+    await store.log_event(
+        "system",
+        "post_deliver_trigger",
+        task_id,
+        {
+            "phase": "scratch_to_proposal",
+            "roles": ["writer", "designer", "engineer", "yuko"],
+        },
+    )
     return _text(f"納品完了。{len(paths)} ファイルをクライアントへ届けました。")
 
 

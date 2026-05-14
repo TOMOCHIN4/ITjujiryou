@@ -238,7 +238,9 @@ tests/
 
 **症状**: 受付や社長が、部下に振らずに自分でコードや文章を書く。
 **原因**: ツール権限が広すぎる。
-**対策**: 社長の `.claude/settings.json` で Bash/Edit/Write/MultiEdit/WebSearch/WebFetch/dispatch_task/deliver/evaluate_deliverable/propose_plan/consult_peer/consult_souther を **すべて `permissions.deny`**。これでコード側に物理的に強制される。テストは `tests/test_president_no_tools.py`。
+**対策**: 社長の `.claude/settings.json` で Bash/Edit/Write/MultiEdit/WebSearch/WebFetch/dispatch_task/deliver/evaluate_deliverable/propose_plan/consult_peer/consult_souther を **すべて `permissions.deny`**。テストは `tests/test_president_no_tools.py` (settings.json の **静的検証**)。
+
+**⚠️ 重要な注意 (2026-05-14 発見)**: 現状の本番運用 `scripts/start_office.sh` は `claude --dangerously-skip-permissions` で起動しているため、**`permissions.deny` は本番ランタイムで全 skip される** ([permission-modes.md 公式](https://code.claude.com/docs/en/permission-modes): "`bypassPermissions` skips the permission layer entirely")。サウザー化防止の物理ブロックは実は効いておらず、実質的なガードは **hooks 経路** (`scripts/hooks/check_souther_recipient.py` の PreToolUse hook 等) のみ。物理ブロックを復活させるには `--permission-mode dontAsk` への切替を要検討 (memory: `project_permission_dontask_proposal.md`)。
 
 **発言制御 (Omage Gate)**: サザンの返答は `scripts/hooks/inject_souther_mode.py` の UserPromptSubmit hook が Python ガードレールで制御する。報告受信 → 27 quote (`workspaces/souther/_modules/quotes.md`) から cooldown 付きで 3 つ抽選 → Claude が 3 オマージュを内部構築 → 最もサウザーらしい 1 案を `send_message(to="yuko", message_type="approval")` で送信、という流れ。プロンプト中心制御では発言ブレが抑えられないため、Python ロジック側で語彙集合を絞る方式に移行 (2026-05-13 設計)。サザンは `check_souther_recipient.py` PreToolUse hook で **yuko 宛以外への送信を物理 deny** されている。
 
@@ -287,13 +289,62 @@ tests/
 ## 9. 将来拡張 (v3.x 以降)
 
 - `46to47.rtfd/` (個人参照資料) の Opus 4.7 向けプロンプト作法を `workspaces/*/CLAUDE.md` に反映
-- `data/memory/{role}/` への経験蓄積 (各部下が Write 可能だが活用パターン未確立)
 - ピクセルアート UI (Phase 3 構想)
 - MCP 連携拡張 (Notion / Gmail / Slack / GitHub の MCP server を `.mcp.json` に追加)
+- アーカイブ運用 (記憶システム §7): 90 日経過した `_scratch/{case_id}/` を `_archive/{case_id}.tar.gz` 化するバッチ
 
 ---
 
-## 10. 引き継ぎチェックリスト (新規セッション向け)
+## 10. 記憶・経験積み上げシステム (v3.2, 2026-05-14)
+
+### 10.1 二系統
+
+会社記憶 (`data/memory/company/`) と個人記憶 (`data/memory/{role}/`)。
+ユウコは全閲覧可、サザンは自分 + 会社のみ、三兄弟は自分 + 会社のみ。
+物理ガードは `workspaces/{role}/.claude/settings.json` の `permissions.deny` に `Read(${CLAUDE_PROJECT_DIR}/../../data/memory/{他人}/**)` を追加することで「記述」されている (`tests/test_memory_access_guards.py` 静的検証 PASS)。
+
+**⚠️ 重要 (2026-05-14 発見)**: 本番運用 `scripts/start_office.sh` は `--dangerously-skip-permissions` で起動しているため、上記の Read deny は **本番ランタイムで全 skip される** (§7.1 注意参照)。現状の実質的なアクセス制御は **CLAUDE.md の規律 + memory-search subagent プロンプトでの検索範囲限定** で担保。物理ブロックを復活させるには dontAsk モード切替が必要 (memory: `project_permission_dontask_proposal.md`)。
+
+### 10.2 案件中 → 案件終了時 (積み上げ → 整理)
+
+案件中は各人が `data/memory/{自分}/_scratch/{case_id}/` に Write tool で直接書く。書き込む節目は 4 つ:
+
+1. 着手直後 (`pre-start.md`)
+2. subtask 完了時 (`mid-work-{round}.md`, revision_round 含む)
+3. レビュー (revise) 受領直後 (`revision-received-{round}.md`)
+4. 完了報告直前 (`post-deliver-draft.md`)
+
+`deliver` 完了直後、`src/mcp_server.py:_handle_deliver` が `events.post_deliver_trigger` を insert。`scripts/inbox_watcher.py` が拾い、各 role pane に「scratch を整理せよ」プロンプトを tmux send-keys で投入する。
+
+### 10.3 会社記憶確定フロー
+
+```
+兄弟整理
+  ↓ data/memory/{role}/_proposals/{case_id}.md を生成
+  ↓ ユウコへ send_message(message_type="memory_proposal")
+ユウコ統合
+  ↓ data/memory/company/_proposals/{case_id}.md を Write
+  ↓ サザンへ consult_souther(message_type="memory_approval_request")
+サザン儀礼承認
+  ↓ send_message(to="yuko", message_type="memory_approval", refs={"proposal_path": ...})
+inbox_watcher が memory_approval を特殊処理
+  ↓ data/memory/company/{category}/{slug}.md に物理反映
+  ↓ data/memory/company/_last_write.log に JSONL 追記
+  ↓ data/memory/company/_proposals/_archived/{case_id}.md に移動
+  ↓ ユウコへ memory_finalized 通知
+```
+
+### 10.4 検索 subagent
+
+他人 / 自分の大きな記憶は `Task(subagent_type="memory-search")` で要約取得。per-role 配置 (`workspaces/{role}/.claude/agents/memory-search.md`)。subagent は `tools: Read, Glob, Grep` のみ持ち、distilled summary を返す。生 Read は親 context に届かない (Task tool 境界で担保)。
+
+### 10.5 アンチゴール
+
+ベクトル検索しない / 知識グラフしない / リアルタイム更新しない / 全記憶毎回読込しない / cross-agent 自動共有しない。
+
+---
+
+## 11. 引き継ぎチェックリスト (新規セッション向け)
 
 新規セッションが立ち上がった際、以下を順に確認:
 

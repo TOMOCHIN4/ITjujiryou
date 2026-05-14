@@ -8,9 +8,13 @@
 #
 # 既にセッションがあれば attach のみ。
 # 環境変数:
-#   ITJ_SKIP_PERMISSIONS=true (default) : claude を --dangerously-skip-permissions で起動
-#   ITJ_OPEN_API=true (default)         : api ウィンドウを起動
-#   ITJ_OPEN_WATCHER=true (default)     : watcher ウィンドウを起動
+#   ITJ_PERMISSION_MODE=dontAsk (default) : claude を --permission-mode <mode> で起動
+#       dontAsk           : allow に列挙されたツール + read-only Bash のみ実行可、それ以外 auto-deny (推奨、物理ブロック有効)
+#       bypassPermissions : --dangerously-skip-permissions 相当 (旧設定、permissions が全 skip される)
+#       auto              : classifier が背景で危険操作を判定 (Max + Opus 4.7 要件、PLAN.md 参照)
+#       default           : 通常モード (プロンプトが出るので自律駆動不可)
+#   ITJ_OPEN_API=true (default)           : api ウィンドウを起動
+#   ITJ_OPEN_WATCHER=true (default)       : watcher ウィンドウを起動
 
 set -euo pipefail
 
@@ -36,10 +40,16 @@ asyncio.run(get_store().init())
 print('[start_office] DB initialized (WAL mode)')
 " 2>&1 | grep -v '^$' || true
 
-CLAUDE_CMD="claude"
-if [ "${ITJ_SKIP_PERMISSIONS:-true}" = "true" ]; then
-    CLAUDE_CMD="claude --dangerously-skip-permissions"
-fi
+PERMISSION_MODE="${ITJ_PERMISSION_MODE:-dontAsk}"
+case "$PERMISSION_MODE" in
+    dontAsk|bypassPermissions|auto|default|acceptEdits|plan)
+        CLAUDE_CMD="claude --permission-mode $PERMISSION_MODE"
+        ;;
+    *)
+        echo "[start_office] unknown ITJ_PERMISSION_MODE='$PERMISSION_MODE' (allowed: dontAsk / bypassPermissions / auto / default / acceptEdits / plan)" >&2
+        exit 1
+        ;;
+esac
 # claude が exit しても pane が消えないように bash を後追いで残す
 WRAPPED_CLAUDE="$CLAUDE_CMD; echo '[claude exited, press Ctrl-C to leave bash]'; exec bash -i"
 
@@ -87,7 +97,7 @@ fi
 tmux select-window -t "$SESSION:office"
 
 cat <<EOM
-[start_office] session '$SESSION' を起動しました。
+[start_office] session '$SESSION' を起動しました (permission-mode=$PERMISSION_MODE)。
 
   - office  pane: 0=souther / 1=yuko / 2=designer / 3=engineer / 4=writer / 5=monitor
   - watcher ウィンドウ: inbox_watcher.py 常駐
@@ -97,6 +107,7 @@ cat <<EOM
   stop  : $ROOT/scripts/stop_office.sh
   Haiku  : $ROOT/scripts/use_haiku.sh で 5 人とも Haiku に切替
   Opus   : $ROOT/scripts/use_opus.sh で本番 Opus に戻す
+  Mode   : ITJ_PERMISSION_MODE=<mode> を環境変数で渡すと起動モードを切替 (デフォルト dontAsk)
 EOM
 
 if [ -t 0 ] && [ "${ITJ_AUTOATTACH:-true}" = "true" ]; then

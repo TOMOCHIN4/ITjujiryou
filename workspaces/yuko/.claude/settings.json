@@ -13,8 +13,12 @@
       "mcp__itjujiryou__record_thought",
       "Task",
       "Read",
-      "Write(${CLAUDE_PROJECT_DIR}/../../outputs/**)",
-      "Edit(${CLAUDE_PROJECT_DIR}/../../outputs/**)",
+      "Write(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/outputs/**)",
+      "Edit(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/outputs/**)",
+      "Write(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/yuko/**)",
+      "Edit(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/yuko/**)",
+      "Write(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/company/_proposals/**)",
+      "Edit(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/company/_proposals/**)",
       "Bash(ls:*)",
       "Bash(cat:*)",
       "Bash(grep:*)",
@@ -38,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/../../.venv/bin/python ${CLAUDE_PROJECT_DIR}/../../scripts/hooks/check_persona_leak.py"
+            "command": "//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/.venv/bin/python //Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/scripts/hooks/check_persona_leak.py"
           }
         ]
       },
@@ -47,7 +51,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/../../.venv/bin/python ${CLAUDE_PROJECT_DIR}/../../scripts/hooks/check_persona_leak.py"
+            "command": "//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/.venv/bin/python //Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/scripts/hooks/check_persona_leak.py"
           }
         ]
       }

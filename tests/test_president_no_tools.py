@@ -2,6 +2,12 @@
 
 マルチプロセス構成では、社長 (workspaces/souther) の Claude Code プロセスが
 permissions.deny で実務ツールを完全に遮断されていることをファイルレベルで保証する。
+
+⚠️ 注 (2026-05-14): これは settings.json の **静的検証** であり、本番ランタイムでの
+効力を保証するものではない。本番 (`scripts/start_office.sh` が `--dangerously-skip-permissions`
+で起動) では `permissions.deny` 全体が skip される (公式 permission-modes.md)。
+サウザー化防止の実質的なガードは hooks 経路 (PreToolUse の check_souther_recipient.py)
+のみ。物理ブロック復活は `--permission-mode dontAsk` への切替で実現する (PLAN.md 参照)。
 """
 from __future__ import annotations
 

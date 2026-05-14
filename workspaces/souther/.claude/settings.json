@@ -4,6 +4,7 @@
     "allow": [
       "mcp__itjujiryou__send_message",
       "mcp__itjujiryou__read_status",
+      "Task",
       "Read"
     ],
     "deny": [
@@ -21,7 +22,11 @@
       "mcp__itjujiryou__propose_plan",
       "mcp__itjujiryou__consult_peer",
       "mcp__itjujiryou__consult_souther",
-      "mcp__itjujiryou__update_status"
+      "mcp__itjujiryou__update_status",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/writer/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/designer/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/engineer/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/yuko/**)"
     ]
   },
   "model": "claude-opus-4-7",

@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS events (
     event_type TEXT NOT NULL,
     task_id TEXT REFERENCES tasks(id),
     details TEXT,
-    parent_event_id INTEGER REFERENCES events(id)
+    parent_event_id INTEGER REFERENCES events(id),
+    processed_at TEXT
 );
 
 -- 初期計画 (Phase 1.5)
@@ -81,6 +82,8 @@ CREATE INDEX IF NOT EXISTS idx_messages_undelivered
 CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id);
 CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_events_parent ON events(parent_event_id);
+CREATE INDEX IF NOT EXISTS idx_events_unprocessed
+    ON events(event_type, processed_at) WHERE processed_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_plans_task ON plans(task_id);
 CREATE INDEX IF NOT EXISTS idx_revisions_task ON revisions(task_id);
 CREATE INDEX IF NOT EXISTS idx_revisions_subtask ON revisions(subtask_id);
