@@ -7,18 +7,22 @@
 
 ## 未着手 TODO
 
-### [優先] dontAsk モード切替 (物理ブロック復活)
+### [次セッション] サザン雑務集中設計
 
-`scripts/start_office.sh:41` の `claude --dangerously-skip-permissions` を `claude --permission-mode dontAsk` に置換する。
+サザンの稼働率が低い (儀礼承認のみ) のを是正し、「案件中に必ず発生・誰がやってもよい・納品の質に直接影響しない」雑務 (ユウコ門番機能の一部、会社記憶の体系化整理、クライアント記録メンテ等) をサザンに集中させる。
 
-**Why**: bypass モードでは settings.json の `permissions.deny` / `permissions.allow` が全 skip される (公式 [permission-modes.md](https://code.claude.com/docs/en/permission-modes) で確認、2026-05-14)。サウザー化防止 (SPEC.md §7.1) や記憶アクセスガード (§10.1) の物理ブロックが本番では効いておらず、実質ガードは hook 経路のみ。dontAsk モードなら allow に書かれたツール + read-only Bash のみ実行可で、自律駆動 (tmux 監視ゼロ) と物理ブロックを両立できる。
+肝になる要素:
+- Task subagent 経由でサザンが実務を代行 (聖帝が直接手を動かさない原則を維持)
+- ユウコ workflow.md Step F の memory_proposal 統合フェーズをサザンに移譲
+- 既存 Omage Gate (Python ガードレール) は維持
 
-着手前に必ず読む:
-- memory: `project_permission_dontask_proposal.md` (切替手順 + 事前チェック項目)
-- memory: `feedback_bypass_permissions_pitfall.md` (現状の問題)
-- memory: `feedback_permissions_caution.md` (パーミッション変更は実機検証必須)
-
-実機検証必須: 案件 1 件を流して allow リスト不足で auto-deny が出ないか確認、各 hook が引き続き動くか確認。
+着手前に読む:
+- memory: `project_next_session_souther_chores.md` (設計骨子 / 移管候補 / 論点 4 つ)
+- memory: `feedback_subagent_vs_pane.md` (subagent vs pane の判断)
+- memory: `feedback_python_guardrail_pattern.md` (Omage Gate の再利用テンプレート)
+- `workspaces/souther/CLAUDE.md` + `_modules/persona_narrative.md`
+- `workspaces/yuko/_modules/workflow.md` Step F
+- `SPEC.md §10.3` (会社記憶確定フローの現状)
 
 ### [将来] 記憶システム §7 アーカイブ運用
 

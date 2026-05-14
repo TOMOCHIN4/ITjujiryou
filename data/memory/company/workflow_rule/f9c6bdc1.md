@@ -1,0 +1,41 @@
+---
+schema: company-memory/v1
+category: workflow_rule
+case_ids: [f9c6bdc1-d48c-44bf-b52a-282329cef8ab]
+contributors: []
+approved_at: 2026-05-14T00:35:43.606730+00:00
+approved_by: souther
+keywords: []
+---
+
+## 提案する会社ルール
+
+**クライアントへ届くテキスト (deliver の delivery_message, send_message to=client 系, 公開資料) には社名「愛帝十字陵」および「愛帝」表記を一切含めない。**
+
+- 署名は「ユウコ」「秘書のユウコ」「弊社 ユウコ」等で通す
+- 社名を口にしたくなる場面では「弊社」「弊事務所」へ置換
+- 自社名抜きでも、クライアントは発注経路で社名を既に把握している前提で運用
+
+このルールは既存の「本文中の北斗・南斗・聖帝・拳王・愛帝等の禁則」(persona_guard.md / writer style_notes) を **署名・名乗りレベルにまで拡張** するものとして位置付ける。
+
+## Why
+
+- `scripts/hooks/check_persona_leak.py` の FORBIDDEN_TERMS に **「愛帝」が登録済**。delivery_message を物理的に検閲してブロックする (案件 f9c6bdc1 の初回 deliver で実証)
+- 「愛帝」は社訓「制圧前進」由来の社内ペルソナ用語であり、対外文書に出してはいけないという persona_guard 原則の核心
+- 全 role (yuko の deliver, 部下が client 向け文面案を起草する場合) に効くルール
+- ハオウの `writer/style_notes/non_pushy_tone.md` は本文レベルの禁則を明文化済だが、署名・社名名乗りの観点は欠落
+- ユウコの `yuko/persona_translation/client_signature.md` は署名レベルを規定済だが、ユウコ個人領域に閉じており writer/designer/engineer から不可視
+- 両ギャップを company/workflow_rule に統合昇格させ、全社員が読める形にする
+
+## How to apply
+
+- 全 role が deliver / client 向け文書を起草する際、署名行を含めて「愛帝」「十字陵」が混入していないか自己点検する
+- 既存ドキュメント `workspaces/yuko/_modules/persona_guard.md` の禁止用語節に「自社名『愛帝十字陵』は FORBIDDEN_TERMS と衝突するため対外文書では使用不可」の一文を追加することを推奨 (実装は別案件)
+- 違反検知は既に `scripts/hooks/check_persona_leak.py` 経由で自動化済 (追加実装不要)
+- 部下が client 宛文面案を yuko へ上げる場合も、ハオウ等は同ルールで起草する (yuko 側の修正コスト削減)
+
+## 関連
+
+- 個人記憶 (ユウコ): [[client-signature-no-company-name]] — 運用詳細
+- 個人記憶 (ハオウ): writer/style_notes/non_pushy_tone.md — 本文語彙レベルの禁則 (本提案の隣接知見)
+- 既存ドキュメント: workspaces/yuko/_modules/persona_guard.md — FORBIDDEN_TERMS リスト原典

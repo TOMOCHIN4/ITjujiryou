@@ -1,0 +1,4 @@
+# JSONL log of company memory writes triggered by サザン儀礼承認 → company_memory_write HOOK (Phase 4 D7 で本実装)
+# 1 行 = {"timestamp": "ISO8601", "trigger_msg_id": "...", "approval_msg_id": "...", "files_written": [...]}
+# Phase 3a-0 時点では空。scripts/hooks/check_last_write.py が SessionStart で最終行 timestamp を読む
+{"timestamp": "2026-05-14T00:35:43.606911+00:00", "task_id": "f9c6bdc1-d48c-44bf-b52a-282329cef8ab", "approval_msg_id": "0b07736f-c118-4993-8432-9c4a2155ddca", "proposal_path": "data/memory/company/_proposals/f9c6bdc1-d48c-44bf-b52a-282329cef8ab.md", "written_path": "data/memory/company/workflow_rule/f9c6bdc1.md", "category": "workflow_rule", "contributors": []}
