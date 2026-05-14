@@ -24,13 +24,15 @@
 - `workspaces/yuko/_modules/workflow.md` Step F
 - `SPEC.md §10.3` (会社記憶確定フローの現状)
 
-### [次セッション ついで] 全 role の effort を xhigh に明示
+### [次セッション ついで] 全 role の effortLevel を xhigh に明示
 
-現状 5 workspaces の settings.json には `"model": "claude-opus-4-7"` のみ指定、`effort` は未設定 (pane status bar の `⚡xhigh` は Claude Code デフォルト由来)。
-明示的に `"effort": "xhigh"` を 5 settings.json に追記して固定する。
+現状 5 workspaces の settings.json には `"model": "claude-opus-4-7"` のみ指定、`effortLevel` は未設定 (pane status bar の `⚡xhigh` は Claude Code デフォルト由来)。
+明示的に `"effortLevel": "xhigh"` を 5 settings.json に追記して固定する。
 
-- `workspaces/{souther,yuko,writer,designer,engineer}/.claude/settings.json` の最上位に `"effort": "xhigh"` を追加
-- subagent (`workspaces/*/.claude/agents/memory-search.md`) は session の effort を継承するため明示不要 (公式: "Default: inherits from session")
+**注意: キー名は `effortLevel` (settings.json) と `effort` (subagent frontmatter) で異なる**。詳細は memory `feedback_effort_level_key_naming.md` 参照。
+
+- `workspaces/{souther,yuko,writer,designer,engineer}/.claude/settings.json` の最上位に `"effortLevel": "xhigh"` を追加 (camelCase + Level suffix)
+- subagent (`workspaces/*/.claude/agents/memory-search.md`) は session の effort を継承するため明示不要 (公式: "Default: inherits from session"。明示する場合は frontmatter キー名 `effort` を使う)
 - ホーム階層 (`~/.claude/settings.json`) ではなく role ごとに明示する方が「サザンだけ max にする」等の調整が後でしやすい
 
 ### [将来] 記憶システム §7 アーカイブ運用
