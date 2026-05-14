@@ -36,6 +36,11 @@ STATE_PATH = LOGS_DIR / "souther_state.json"
 COOLDOWN_RECENT_PICKS = 5  # 直近 5 picks (= 最大 15 quote_no) は除外候補
 PICK_COUNT = 3
 
+# Backstage sentinel: prompt 先頭にこれが付いていたら Omage Gate を skip し、
+# 裏側 silent モード用 context を注入する。memory-curator subagent を起動して
+# ユウコへ短い curator_response を返す経路に乗せるためのマーカー。
+BACKSTAGE_TAG = "[BACKSTAGE:curator]"
+
 # Always-injected response constraints. 27 quote 抽選より前に置く。
 _DEFAULT_CONSTRAINTS: str = (
     "## RESPONSE CONSTRAINTS (always in effect)\n\n"
@@ -135,8 +140,16 @@ def _pick_three(quotes: list[dict], recent_picks: list[list[int]]) -> list[dict]
     return random.sample(pool, PICK_COUNT)
 
 
-def _build_omage_context(prompt: str, picks: list[dict]) -> str:
-    """3 つの quote から Omage Gate の additionalContext 本文を組み立てる。"""
+def _build_omage_context(
+    prompt: str, picks: list[dict], reply_type: str = "approval"
+) -> str:
+    """3 つの quote から Omage Gate の additionalContext 本文を組み立てる。
+
+    `reply_type` は応答の `message_type` に埋め込まれる (2026-05-14 追加)。
+    例: `memory_approval_request` 受領時は `reply_type="memory_approval"` を渡せば
+    `send_message(... message_type="memory_approval")` を指示できる。
+    呼び出し元の `main()` が `_extract_message_type(prompt)` で導く。
+    """
     report_excerpt = prompt.strip()
     if len(report_excerpt) > 2000:
         report_excerpt = report_excerpt[:2000] + "\n... (以下省略)"
@@ -176,7 +189,7 @@ def _build_omage_context(prompt: str, picks: list[dict]) -> str:
         "   send_message(from_agent=\"souther\", to=\"yuko\",\n"
         "                task_id=<上申の task_id>,\n"
         "                content=<採用した 1 案>,\n"
-        "                message_type=\"approval\")\n"
+        f"                message_type=\"{reply_type}\")\n"
         "   ```\n"
         "4. **禁則**: 残り 2 案は外に出すな。3 案を並べて見せるな。1 案だけが返答だ。\n"
         "5. **長さ**: 上記 RESPONSE CONSTRAINTS を遵守 (1-2 文 default、hard cap 4 文)。\n"
@@ -208,6 +221,83 @@ def _extract_prompt(event: dict) -> str:
     return json.dumps(event, ensure_ascii=False)
 
 
+_TYPE_LINE_RE = re.compile(r"^\s*type:\s*(\S+)", re.MULTILINE)
+
+
+def _extract_message_type(prompt: str) -> str:
+    """prompt 内の `type: xxx_request` 行から応答 message_type を導く。
+
+    watcher の `format_prompt()` (`scripts/inbox_watcher.py:72`) が:
+
+        新着メッセージ (msg_id=...):
+          from: ...
+          type: memory_approval_request    ← この行
+          task_id: ...
+
+    の形で投入してくる。これをパースして `_request` suffix を除いた値を返す:
+    - `type: memory_approval_request` → `"memory_approval"`
+    - `type: approval_request`        → `"approval"`
+
+    backstage 経路 (`curator_request`) はこの関数の手前で別分岐するため、
+    通常は到達しない。型行が見つからない場合 (人間直接入力等) は `"approval"`
+    にフォールバック (2026-05-13 以前の挙動と互換)。
+
+    2026-05-14 追加 (verify-003 v3 で発覚した workaround の根本修正)。
+    v5 補足: watcher が tmux 経由で投入する prompt は `\n` ではなく `\r` 改行で届くため、
+    regex マッチ前に改行を normalize する。
+    """
+    if not prompt:
+        return "approval"
+    normalized = prompt.replace("\r\n", "\n").replace("\r", "\n")
+    m = _TYPE_LINE_RE.search(normalized)
+    if not m:
+        return "approval"
+    raw = m.group(1).strip()
+    if raw.endswith("_request"):
+        return raw[: -len("_request")]
+    return raw
+
+
+def _is_backstage(prompt: str) -> bool:
+    """prompt 先頭が裏側 sentinel `[BACKSTAGE:curator]` で始まるか。"""
+    return prompt.lstrip().startswith(BACKSTAGE_TAG)
+
+
+def _build_silent_context(prompt: str) -> str:
+    """裏側 silent モード用 additionalContext を組み立てる。
+
+    Omage Gate を skip し、memory-curator subagent を起動して
+    curator_response でユウコへ短く通知する経路を指示する。
+    """
+    body = prompt.lstrip()
+    if body.startswith(BACKSTAGE_TAG):
+        body = body[len(BACKSTAGE_TAG):].lstrip()
+    if len(body) > 4000:
+        body = body[:4000] + "\n... (以下省略)"
+
+    return (
+        "## 裏側プロンプト (silent mode)\n\n"
+        "**このターンは UI に出さず、機械的に処理してください。聖帝口調は不要です。"
+        "Omage Gate (27 quote 抽選) は skip されました。**\n\n"
+        "あなたはサザンの『裏側オペレーター』として起動しました。"
+        "以下の curator_request を読み、`Task(subagent_type=\"memory-curator\", prompt=...)` を起動して、\n"
+        "subagent が返した `data/memory/company/_proposals/{case_id}.md` の path を `refs` に入れて、\n"
+        "ユウコへ短い `send_message(to=\"yuko\", message_type=\"curator_response\", "
+        "refs={...}, content=...)` を返してください。\n\n"
+        "---\n\n"
+        f"{body}\n\n"
+        "---\n\n"
+        "## 出力ルール (裏側 silent)\n\n"
+        "1. 必ず Task(subagent_type=\"memory-curator\") を起動すること。"
+        "本体 pane で直接 Read/Glob/Grep/Write しない。聖帝が手を動かすのは帝王の流儀に反する。\n"
+        "2. subagent の返却 (`proposed: data/memory/company/_proposals/...md`) の path を "
+        "`refs={\"proposal_path\": \"...\", \"operation\": \"...\"}` に詰める。\n"
+        "3. content は 1 文で十分: 「裏側完了。proposed: {path}」。聖帝口調・heroic 台詞は使わない。\n"
+        "4. これは Omage Gate ではない。3 案・自選・名台詞抽選は不要。一気に処理して返す。\n"
+        "5. message_type は必ず `curator_response`。to は必ず `yuko`。\n"
+    )
+
+
 def main() -> int:
     # stdin から hook event JSON を読む
     try:
@@ -217,6 +307,22 @@ def main() -> int:
         event = {}
 
     prompt = _extract_prompt(event)
+
+    # 裏側 silent モード: sentinel を検出したら Omage Gate を skip して silent context のみ注入。
+    # cooldown 状態 / spotlight log は触らない (UI/ログに痕跡を残さない)。
+    if _is_backstage(prompt):
+        out = {
+            "hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": _build_silent_context(prompt),
+            }
+        }
+        sys.stdout.write(json.dumps(out, ensure_ascii=False))
+        sys.stdout.flush()
+        return 0
+
+    # 表側 (omage 経路): prompt 内の `type: xxx_request` から応答 message_type を導く
+    reply_type = _extract_message_type(prompt)
 
     # quotes.md を parse。失敗時は constraints のみ注入で fall through
     parts: list[str] = [_DEFAULT_CONSTRAINTS]
@@ -233,7 +339,7 @@ def main() -> int:
                 new_recent = [[q["no"] for q in picks]] + recent_picks
                 state["recent_picks"] = new_recent[:COOLDOWN_RECENT_PICKS]
                 _save_state(state)
-                parts.append(_build_omage_context(prompt, picks))
+                parts.append(_build_omage_context(prompt, picks, reply_type=reply_type))
         except Exception as e:  # noqa: BLE001
             print(f"[inject_souther_mode] parse error: {e}", file=sys.stderr)
     else:

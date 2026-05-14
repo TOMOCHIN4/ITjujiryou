@@ -8,10 +8,10 @@
 #
 # 既にセッションがあれば attach のみ。
 # 環境変数:
-#   ITJ_PERMISSION_MODE=dontAsk (default) : claude を --permission-mode <mode> で起動
-#       dontAsk           : allow に列挙されたツール + read-only Bash のみ実行可、それ以外 auto-deny (推奨、物理ブロック有効)
+#   ITJ_PERMISSION_MODE=auto (default、2026-05-14 切替) : claude を --permission-mode <mode> で起動
+#       auto              : classifier が背景で危険操作を判定 (Max + Opus 4.7 要件)、`Tool(//abs/**)` path glob の実装不整合を回避できる現行推奨モード
+#       dontAsk           : allow に列挙されたツール + read-only Bash のみ実行可、それ以外 auto-deny (旧推奨、path glob 不整合で本体/subagent ともに正しく動かない事例あり、memory: feedback_subagent_write_glob_inheritance.md)
 #       bypassPermissions : --dangerously-skip-permissions 相当 (旧設定、permissions が全 skip される)
-#       auto              : classifier が背景で危険操作を判定 (Max + Opus 4.7 要件、PLAN.md 参照)
 #       default           : 通常モード (プロンプトが出るので自律駆動不可)
 #   ITJ_OPEN_API=true (default)           : api ウィンドウを起動
 #   ITJ_OPEN_WATCHER=true (default)       : watcher ウィンドウを起動
@@ -40,7 +40,7 @@ asyncio.run(get_store().init())
 print('[start_office] DB initialized (WAL mode)')
 " 2>&1 | grep -v '^$' || true
 
-PERMISSION_MODE="${ITJ_PERMISSION_MODE:-dontAsk}"
+PERMISSION_MODE="${ITJ_PERMISSION_MODE:-auto}"
 case "$PERMISSION_MODE" in
     dontAsk|bypassPermissions|auto|default|acceptEdits|plan)
         CLAUDE_CMD="claude --permission-mode $PERMISSION_MODE"
@@ -107,7 +107,7 @@ cat <<EOM
   stop  : $ROOT/scripts/stop_office.sh
   Haiku  : $ROOT/scripts/use_haiku.sh で 5 人とも Haiku に切替
   Opus   : $ROOT/scripts/use_opus.sh で本番 Opus に戻す
-  Mode   : ITJ_PERMISSION_MODE=<mode> を環境変数で渡すと起動モードを切替 (デフォルト dontAsk)
+  Mode   : ITJ_PERMISSION_MODE=<mode> を環境変数で渡すと起動モードを切替 (デフォルト auto、2026-05-14 切替)
 EOM
 
 if [ -t 0 ] && [ "${ITJ_AUTOATTACH:-true}" = "true" ]; then

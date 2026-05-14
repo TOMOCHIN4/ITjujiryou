@@ -22,11 +22,18 @@
       "mcp__itjujiryou__propose_plan",
       "mcp__itjujiryou__consult_souther",
       "Bash",
-      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/designer/**)",
-      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/engineer/**)",
-      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/yuko/**)",
-      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/souther/**)"
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/designer/past_works/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/designer/style_notes/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/designer/techniques/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/engineer/bugs/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/engineer/patterns/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/engineer/preferences/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/yuko/client_handling/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/yuko/persona_translation/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/yuko/routing_decisions/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/souther/doctrines/**)"
     ]
   },
-  "model": "claude-opus-4-7"
+  "model": "claude-opus-4-7",
+  "effortLevel": "xhigh"
 }

@@ -84,6 +84,33 @@ def format_prompt(msg: dict) -> str:
     )
 
 
+# 裏側 silent モードへのトリガー sentinel。inject_souther_mode.py が prompt 先頭に
+# これを見つけたら Omage Gate を skip し、memory-curator subagent 起動経路に乗せる。
+BACKSTAGE_CURATOR_TAG = "[BACKSTAGE:curator]"
+
+
+def format_backstage_curator_prompt(msg: dict) -> str:
+    """curator_request を souther pane に投入する裏側プロンプト。
+
+    `format_prompt` と同じ構造だが先頭に `BACKSTAGE_CURATOR_TAG` を付加し、
+    末尾の指示文を memory-curator subagent 起動向けに差し替えている。
+    """
+    content = msg["content"]
+    task_id = msg.get("task_id") or ""
+    return (
+        f"{BACKSTAGE_CURATOR_TAG}\n"
+        f"新着メッセージ (msg_id={msg['id']}):\n"
+        f"  from: {msg['from_agent']}\n"
+        f"  type: {msg['message_type']}\n"
+        f"  task_id: {task_id}\n"
+        "---\n"
+        f"{content}\n"
+        "---\n"
+        "裏側で memory-curator subagent を起動して処理し、"
+        "curator_response でユウコへ通知してください。"
+    )
+
+
 # ---------------------------------------------------------------------------
 # 記憶整理フロー (SPEC.md §10.2-10.3)
 # ---------------------------------------------------------------------------
@@ -309,11 +336,18 @@ async def main() -> None:
                     "(will be picked up after pane is added)"
                 )
                 continue
-            prompt = format_prompt(m)
+            # 裏側 silent モード: curator_request to souther は sentinel 付きで送る
+            if to == "souther" and mtype == "curator_request":
+                prompt = format_backstage_curator_prompt(m)
+                marker = "BACKSTAGE"
+            else:
+                prompt = format_prompt(m)
+                marker = ""
             tmux_send(pane, prompt)
             await store.mark_delivered(m["id"])
+            tag = f" [{marker}]" if marker else ""
             print(
-                f"[watcher] -> {to:<8s} ({m['message_type']:<16s}) msg={m['id'][:8]} pane={pane}"
+                f"[watcher] -> {to:<8s} ({m['message_type']:<16s}) msg={m['id'][:8]} pane={pane}{tag}"
             )
 
         # post_deliver_trigger events を処理 (各 role pane に scratch 整理指示を投入)

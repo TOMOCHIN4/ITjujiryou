@@ -1,15 +1,16 @@
-"""記憶システムの物理アクセスガード検証 (SPEC.md §10.1, §10.4)。
+"""記憶システムの物理アクセスガード検証 (SPEC.md §10.1, §10.4, §10.6)。
 
-5 workspaces の settings.json で、他人の data/memory/{role}/** への Read が
-deny されていること、Task tool が allow されていること、yuko だけは memory への
-Write 権限を持ち deny がないこと、を静的に検証する。
+5 workspaces の settings.json で、他人 personal layer (past_articles 等の topic ディレクトリ)
+への Read が **per-topic** で deny されていること、`_proposals/`/`_scratch/` は deny に含まれない
+こと (curator/memory-search subagent 経路を確保するため)、Task tool が allow されていること、
+ユウコだけは memory への Write 権限を持ち deny がないこと、を静的に検証する。
 
-⚠️ 注 (2026-05-14): これは settings.json の **静的検証** であり、本番ランタイムでの
-効力を保証するものではない。本番 (`scripts/start_office.sh` が `--dangerously-skip-permissions`
-で起動) では `permissions.deny` 全体が skip される (公式 permission-modes.md)。
-現状の実質的なアクセス制御は CLAUDE.md の規律 + memory-search subagent プロンプトでの
-検索範囲限定のみ。物理ブロック復活は `--permission-mode dontAsk` への切替が必要
-(PLAN.md / memory: project_permission_dontask_proposal.md)。
+⚠️ 注 (2026-05-14 更新): 本番運用は `ITJ_PERMISSION_MODE=dontAsk` (`scripts/start_office.sh:46`)
+のため `permissions.allow`/`deny` は本番ランタイムでも厳格適用される。本テストは settings.json
+の静的検証だが、本番でも効力を持つ。
+
+サザン二重構造 (SPEC.md §10.6) 実装に伴い、Read deny は per-topic に細分化されている。
+broad な `Read(.../{role}/**)` 形式 (一括 deny) から、per-topic 形式に移行済。
 """
 from __future__ import annotations
 
@@ -21,6 +22,16 @@ WORKSPACES = REPO_ROOT / "workspaces"
 
 ROLES = ("souther", "yuko", "writer", "designer", "engineer")
 
+# 各 role の personal topic (Read deny 対象)。
+# `_proposals/` `_scratch/` は curator/memory-search subagent 経路のため deny しない。
+PERSONAL_TOPICS = {
+    "writer": ("past_articles", "sources", "style_notes"),
+    "designer": ("past_works", "style_notes", "techniques"),
+    "engineer": ("bugs", "patterns", "preferences"),
+    "yuko": ("client_handling", "persona_translation", "routing_decisions"),
+    "souther": ("doctrines",),
+}
+
 
 def _load(role: str) -> dict:
     return json.loads(
@@ -28,9 +39,16 @@ def _load(role: str) -> dict:
     )
 
 
-def _read_deny_path(other_role: str) -> str:
-    # 公式: `//path` は absolute path from filesystem root の正式書式
-    # `${CLAUDE_PROJECT_DIR}` は permission rule では展開されないため使えない
+def _read_deny_path(other_role: str, topic: str) -> str:
+    # 公式 4 形式: `//path` (絶対パス) を使う。`${CLAUDE_PROJECT_DIR}` は permission rule
+    # では展開されない (memory: feedback_permission_rule_glob_format.md 参照)。
+    return (
+        f"Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/"
+        f"{other_role}/{topic}/**)"
+    )
+
+
+def _broad_deny_path(other_role: str) -> str:
     return f"Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/{other_role}/**)"
 
 
@@ -41,38 +59,56 @@ def test_all_workspaces_allow_task_tool():
         assert "Task" in allow, f"{role} settings.json に Task が allow されていない"
 
 
-def test_writer_denies_other_memory_read():
-    """writer は他 4 人 (designer/engineer/yuko/souther) の memory Read を deny。"""
-    deny = _load("writer").get("permissions", {}).get("deny", [])
-    for other in ("designer", "engineer", "yuko", "souther"):
-        assert _read_deny_path(other) in deny, (
-            f"writer settings.json で data/memory/{other}/** Read が deny されていない"
+def _assert_per_topic_deny(role: str, others: tuple[str, ...]) -> None:
+    """role が `others` (他人) の personal topic をすべて per-topic で deny していることを検証。"""
+    deny = _load(role).get("permissions", {}).get("deny", [])
+    for other in others:
+        # broad な一括 deny は禁止 (curator が _proposals/_scratch/ を Read できなくなるため)
+        assert _broad_deny_path(other) not in deny, (
+            f"{role} settings.json で {other} に対する broad deny "
+            f"({_broad_deny_path(other)}) が残っている。per-topic に分割せよ"
         )
+        # 各 personal topic ごとに deny エントリがあること
+        for topic in PERSONAL_TOPICS[other]:
+            expected = _read_deny_path(other, topic)
+            assert expected in deny, (
+                f"{role} settings.json で {other}/{topic}/ Read が deny されていない: "
+                f"期待 = {expected}"
+            )
 
 
-def test_designer_denies_other_memory_read():
-    deny = _load("designer").get("permissions", {}).get("deny", [])
-    for other in ("writer", "engineer", "yuko", "souther"):
-        assert _read_deny_path(other) in deny, (
-            f"designer settings.json で data/memory/{other}/** Read が deny されていない"
-        )
+def test_writer_denies_other_personal_topics():
+    """writer は他 4 人 (designer/engineer/yuko/souther) の personal topic を per-topic で deny。"""
+    _assert_per_topic_deny("writer", ("designer", "engineer", "yuko", "souther"))
 
 
-def test_engineer_denies_other_memory_read():
-    deny = _load("engineer").get("permissions", {}).get("deny", [])
-    for other in ("writer", "designer", "yuko", "souther"):
-        assert _read_deny_path(other) in deny, (
-            f"engineer settings.json で data/memory/{other}/** Read が deny されていない"
-        )
+def test_designer_denies_other_personal_topics():
+    _assert_per_topic_deny("designer", ("writer", "engineer", "yuko", "souther"))
 
 
-def test_souther_denies_other_memory_read():
-    """サザンは自分 + 会社 (company/) のみ可。三兄弟 + ユウコ の memory Read を deny。"""
+def test_engineer_denies_other_personal_topics():
+    _assert_per_topic_deny("engineer", ("writer", "designer", "yuko", "souther"))
+
+
+def test_souther_denies_other_personal_topics():
+    """サザンは自分 (doctrines) + 会社 (company/) + 全 role の _proposals/_scratch/ のみ可。
+    他 4 人の personal topic (past_articles, client_handling 等) は per-topic で deny。"""
+    _assert_per_topic_deny("souther", ("writer", "designer", "engineer", "yuko"))
+
+
+def test_souther_does_not_deny_proposals_or_scratch():
+    """サザンが各 role の `_proposals/` `_scratch/` を Read できる
+    (memory-curator subagent が integrate_proposal 等で必要)。"""
     deny = _load("souther").get("permissions", {}).get("deny", [])
     for other in ("writer", "designer", "engineer", "yuko"):
-        assert _read_deny_path(other) in deny, (
-            f"souther settings.json で data/memory/{other}/** Read が deny されていない"
-        )
+        for sub in ("_proposals", "_scratch"):
+            unwanted = (
+                f"Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/"
+                f"{other}/{sub}/**)"
+            )
+            assert unwanted not in deny, (
+                f"サザン settings.json で {other}/{sub}/ への Read deny が残っている: {unwanted}"
+            )
 
 
 def test_yuko_has_no_memory_read_deny():

@@ -96,7 +96,7 @@ FastAPI (:8000)  ──→  data/office.db (WAL モード)
    ├─────────┼─────────┼─────────┤
    │ engineer│ writer  │ monitor │
    └─────────┴─────────┴─────────┘
-   各 pane: workspaces/{role}/ で `claude --dangerously-skip-permissions` 起動
+   各 pane: workspaces/{role}/ で `claude --permission-mode dontAsk` 起動 (ITJ_PERMISSION_MODE で切替可)
             .claude/settings.json で permissions / hooks 強制
             CLAUDE.md でペルソナ固定
             .mcp.json で itjujiryou MCP server 参照
@@ -240,9 +240,16 @@ tests/
 **原因**: ツール権限が広すぎる。
 **対策**: 社長の `.claude/settings.json` で Bash/Edit/Write/MultiEdit/WebSearch/WebFetch/dispatch_task/deliver/evaluate_deliverable/propose_plan/consult_peer/consult_souther を **すべて `permissions.deny`**。テストは `tests/test_president_no_tools.py` (settings.json の **静的検証**)。
 
-**⚠️ 重要な注意 (2026-05-14 発見)**: 現状の本番運用 `scripts/start_office.sh` は `claude --dangerously-skip-permissions` で起動しているため、**`permissions.deny` は本番ランタイムで全 skip される** ([permission-modes.md 公式](https://code.claude.com/docs/en/permission-modes): "`bypassPermissions` skips the permission layer entirely")。サウザー化防止の物理ブロックは実は効いておらず、実質的なガードは **hooks 経路** (`scripts/hooks/check_souther_recipient.py` の PreToolUse hook 等) のみ。物理ブロックを復活させるには `--permission-mode dontAsk` への切替を要検討 (memory: `project_permission_dontask_proposal.md`)。
+**本番運用は auto モード (2026-05-14 後半切替済)**: `scripts/start_office.sh:43` の `PERMISSION_MODE="${ITJ_PERMISSION_MODE:-auto}"` により本番は `--permission-mode auto` で起動する。auto モードは classifier が危険操作 (rm -rf 等) を背景判定して block、通常操作は通す。dontAsk の `Tool(//abs/**)` path glob 実装不整合 (subagent 継承時のみならず本体 pane でも発覚、designer の `Bash(//.../scripts/gen-asset/**)` で auto-deny された事例あり) を回避する。`permissions.deny` は引き続き hint として機能、`permissions.allow` の path glob は信頼性が低いため `Tool(prefix:*)` 形式を推奨。memory: `feedback_auto_mode_adoption.md`、`feedback_subagent_write_glob_inheritance.md`。
 
 **発言制御 (Omage Gate)**: サザンの返答は `scripts/hooks/inject_souther_mode.py` の UserPromptSubmit hook が Python ガードレールで制御する。報告受信 → 27 quote (`workspaces/souther/_modules/quotes.md`) から cooldown 付きで 3 つ抽選 → Claude が 3 オマージュを内部構築 → 最もサウザーらしい 1 案を `send_message(to="yuko", message_type="approval")` で送信、という流れ。プロンプト中心制御では発言ブレが抑えられないため、Python ロジック側で語彙集合を絞る方式に移行 (2026-05-13 設計)。サザンは `check_souther_recipient.py` PreToolUse hook で **yuko 宛以外への送信を物理 deny** されている。
+
+**二重構造 (2026-05-14 追加)**: サザンの応答経路は **表 (Front Stage)** と **裏 (Backstage)** の二段階に分かれる。
+
+- 表: 上記の Omage Gate。`memory_approval_request` 等の儀礼上申を受領 → 27 quote 抽選 → 聖帝口調で `memory_approval` を返す。UI/会話パネル/`souther_spotlight.log` に発言が記録される
+- 裏: 雑務代行 silent モード。watcher が `to=souther, message_type=curator_request` のメッセージを送る時、prompt 先頭に sentinel `[BACKSTAGE:curator]` を付加 (`scripts/inbox_watcher.py:format_backstage_curator_prompt()`)。`inject_souther_mode.py:_is_backstage()` がこれを検出して **Omage Gate を完全 skip**、silent context のみ注入。サザン本体は `Task(subagent_type="memory-curator")` を起動して `workspaces/souther/.claude/agents/memory-curator.md` に `data/memory/company/_proposals/**` を Write させ、1 文の事務的 `curator_response` をユウコへ返す。omage cooldown も spotlight log も触らない (UI/ログに痕跡を残さない)。
+
+裏側 silent モードは聖帝の威厳 (帝王は手を動かさない) を保ったままサザンの稼働率を引き上げる設計。実装詳細は §10.6。
 
 ### 7.2 ペルソナ混線
 
@@ -303,7 +310,7 @@ tests/
 ユウコは全閲覧可、サザンは自分 + 会社のみ、三兄弟は自分 + 会社のみ。
 物理ガードは `workspaces/{role}/.claude/settings.json` の `permissions.deny` に `Read(${CLAUDE_PROJECT_DIR}/../../data/memory/{他人}/**)` を追加することで「記述」されている (`tests/test_memory_access_guards.py` 静的検証 PASS)。
 
-**⚠️ 重要 (2026-05-14 発見)**: 本番運用 `scripts/start_office.sh` は `--dangerously-skip-permissions` で起動しているため、上記の Read deny は **本番ランタイムで全 skip される** (§7.1 注意参照)。現状の実質的なアクセス制御は **CLAUDE.md の規律 + memory-search subagent プロンプトでの検索範囲限定** で担保。物理ブロックを復活させるには dontAsk モード切替が必要 (memory: `project_permission_dontask_proposal.md`)。
+**本番運用は auto モード (2026-05-14 後半切替済、§7.1 参照)**: 上記の Read deny は auto モードでも hint として機能。実質的なアクセス制御は CLAUDE.md の規律 + memory-search/memory-curator subagent プロンプトの検索範囲限定 + auto モード classifier の判定 の三層で担保している。
 
 ### 10.2 案件中 → 案件終了時 (積み上げ → 整理)
 
@@ -316,23 +323,38 @@ tests/
 
 `deliver` 完了直後、`src/mcp_server.py:_handle_deliver` が `events.post_deliver_trigger` を insert。`scripts/inbox_watcher.py` が拾い、各 role pane に「scratch を整理せよ」プロンプトを tmux send-keys で投入する。
 
-### 10.3 会社記憶確定フロー
+### 10.3 会社記憶確定フロー (二重構造 — 2026-05-14 更新)
 
 ```
 兄弟整理
   ↓ data/memory/{role}/_proposals/{case_id}.md を生成
   ↓ ユウコへ send_message(message_type="memory_proposal")
-ユウコ統合
-  ↓ data/memory/company/_proposals/{case_id}.md を Write
-  ↓ サザンへ consult_souther(message_type="memory_approval_request")
-サザン儀礼承認
-  ↓ send_message(to="yuko", message_type="memory_approval", refs={"proposal_path": ...})
+ユウコ統合依頼
+  ↓ consult_souther(message_type="curator_request",
+                   refs={"operation": "integrate_proposal",
+                         "source_proposal_paths": [...]})
+サザン裏側 (silent モード、Omage Gate skip)
+  ↓ inbox_watcher が prompt 先頭に [BACKSTAGE:curator] を付加
+  ↓ inject_souther_mode.py が sentinel 検出、silent context 注入
+  ↓ Task(subagent_type="memory-curator", operation="integrate_proposal")
+  ↓ memory-curator が data/memory/company/_proposals/{case_id}.md を Write
+  ↓ send_message(to="yuko", message_type="curator_response",
+                refs={"proposal_path": ...})
+ユウコ儀礼上申
+  ↓ consult_souther(message_type="memory_approval_request",
+                   refs={"proposal_path": ...})
+サザン表側 (Omage Gate 発火、聖帝口調)
+  ↓ inject_souther_mode.py が 27 quote 抽選 + omage 指示注入
+  ↓ send_message(to="yuko", message_type="memory_approval",
+                refs={"proposal_path": ...})
 inbox_watcher が memory_approval を特殊処理
   ↓ data/memory/company/{category}/{slug}.md に物理反映
   ↓ data/memory/company/_last_write.log に JSONL 追記
   ↓ data/memory/company/_proposals/_archived/{case_id}.md に移動
   ↓ ユウコへ memory_finalized 通知
 ```
+
+旧フロー (2026-05-08 〜 2026-05-13) では「ユウコ統合」段階でユウコ pane が自ら統合 (matching + 矛盾解消 + 粒度調整 + Write) を担っていたが、ユウコ稼働率の偏重とサザン稼働率の過小を是正するため、統合フェーズをサザン裏側に移譲した (詳細は §10.6)。
 
 ### 10.4 検索 subagent
 
@@ -341,6 +363,77 @@ inbox_watcher が memory_approval を特殊処理
 ### 10.5 アンチゴール
 
 ベクトル検索しない / 知識グラフしない / リアルタイム更新しない / 全記憶毎回読込しない / cross-agent 自動共有しない。
+
+### 10.6 サザン二重構造 (2026-05-14)
+
+サザン pane は **表 (Front Stage)** と **裏 (Backstage)** の二経路を持つ。表は儀礼承認の聖帝口調返答、裏は雑務代行の silent 実務。
+
+#### 構成要素
+
+| 要素 | ファイル | 役割 |
+|---|---|---|
+| sentinel 定数 | `scripts/inbox_watcher.py:BACKSTAGE_CURATOR_TAG` | `[BACKSTAGE:curator]` 文字列 |
+| sentinel 付加 | `scripts/inbox_watcher.py:format_backstage_curator_prompt()` | `to=souther, message_type=curator_request` の prompt 先頭に sentinel を付加 |
+| sentinel 判定 | `scripts/hooks/inject_souther_mode.py:_is_backstage()` | prompt 先頭の sentinel を検出 |
+| silent context | `scripts/hooks/inject_souther_mode.py:_build_silent_context()` | Omage Gate を skip し、memory-curator 起動指示を注入 |
+| 雑務 subagent | `workspaces/souther/.claude/agents/memory-curator.md` | 4 operation を受け付ける裏側オペレーター |
+| サザン allow | `workspaces/souther/.claude/settings.json` の bare `Write` | limited glob は subagent 継承で auto-deny されるため bare 採用、規律ガードは memory-curator.md §6 / persona_narrative.md §6.6 で担保 |
+
+#### 4 operation
+
+`memory-curator` subagent は呼び出し元 (サザン本体 pane) から以下のいずれかの `operation` を受け取る:
+
+1. `integrate_proposal` — 兄弟からの memory_proposal を統合 (ユウコ Step F の代行、§10.3 で本格稼働中)
+2. `cross_review` — company/{category}/ 横断レビュー
+3. `archive_judge` — 90 日経過 `_scratch/` のアーカイブ候補判定
+4. `client_profile_maintenance` — クライアント記録メンテ
+
+全 operation で結果は `data/memory/company/_proposals/{case_id}.md` に Write (subagent が受領 case_id をそのまま使う厳命、独自 slug 禁止 — memory: `feedback_curator_naming_discipline.md`)、`schema: proposal/v1` の frontmatter を持つ。本体反映は表側 (`memory_approval_request` → `memory_approval` → watcher) を経由する。
+
+#### Omage Gate との共存
+
+裏側プロンプト (sentinel あり) を受領した時、`inject_souther_mode.py` は cooldown 状態 (`data/logs/souther_state.json`) と spotlight log (`data/logs/souther_spotlight.log`) を **一切触らない**。表側の omage 抽選頻度に影響を与えず、UI/ログにも痕跡を残さない。これが「サザンの発言はユウコへの返答のみ、単純作業は UI に出ない」要件を満たす。
+
+#### 物理権限の構造 (2026-05-14 verify-003 後)
+
+dontAsk モード下 (§7.1 参照) では、サザン本体 settings.json の:
+- `deny`: `Bash`/`Edit`/`MultiEdit`/`NotebookEdit`/`WebSearch`/`WebFetch`/`TodoWrite` + 一部 MCP tool + 他人 memory の **per-topic** Read (各 role の `past_articles/style_notes/sources/past_works/techniques/bugs/patterns/preferences/client_handling/persona_translation/routing_decisions/doctrines` 等)
+- `allow`: `mcp__itjujiryou__send_message`/`read_status`/`Task`/`Read`/`Write`
+
+**注**: `_proposals/` `_scratch/` は deny に含まれず、subagent が他 role のものも Read 可能 (memory-curator の `integrate_proposal` などのため)。
+
+**bare `Write` 採用の経緯 (verify-003 で発覚)**: 当初 `Write(//.../data/memory/company/_proposals/**)` の limited glob を allow に置く設計だったが、subagent 継承時に path normalization 実装不整合で auto-deny される事例が確認された (memory: `feedback_subagent_write_glob_inheritance.md`)。bare `Write` allow に倒し、物理 glob ガードを諦めた代わりに memory-curator.md §6 / persona_narrative.md §6.6 の **規律ガード** で `_proposals/` 配下のみへの Write を担保している。次セッションで他形式 (`Write(/data/...)` `Write(./data/...)` `Write(~/...)`) を試行して根本解決の候補にする (PLAN.md b 項参照)。
+
+#### テスト
+
+- `tests/test_president_no_tools.py::test_souther_write_allowed_with_discipline_guard` — bare Write allow + memory-curator.md の規律記述 (絶対パス / `_proposals/` のみ) の静的検証
+- `tests/test_president_no_tools.py::test_souther_has_memory_curator_agent` — subagent frontmatter (`name` / `tools` / `effort`) の静的検証
+- `tests/test_souther_quote_picker.py::test_hook_skips_omage_for_backstage_sentinel` — sentinel あり prompt で Omage Gate が skip されることを subprocess hook 起動で確認
+- `tests/test_inbox_watcher_curator.py` — `format_backstage_curator_prompt()` の出力検証
+- `tests/test_memory_access_guards.py` — per-topic Read deny 検証 + `_proposals/_scratch/` が deny に含まれないことを検証
+
+#### E2E verify-003 v7 結果 (2026-05-14、workaround 全撤去後の最終確認)
+
+verify-003 シリーズ (v2→v7) で順次根本修正を進め、v7 で全 8 段階を **workaround 無し** で通過確認:
+
+```
+writer → yuko    [memory_proposal]
+yuko   → yuko    [thought]
+yuko   → souther [curator_request]
+souther → yuko   [curator_response]   ← {case_id}.md 厳命遵守: verify003-souther-dual-v7.md
+yuko   → souther [memory_approval_request]
+souther → yuko   [memory_approval]    ← Omage Gate context-aware 化で直接 memory_approval 返却
+system → yuko    [memory_finalized]   ← watcher 物理反映: client_profile/verify00.md (1712 bytes)
+```
+
+verify-003 シリーズで発覚 → 解決した課題:
+- v3: 初回成功 (workaround 2 件残: approval rewrite + bare Write)
+- v6: subagent 命名 drift (`{slug}.md` で Write して watcher が stuck) 発覚
+- v7: Omage Gate context-aware 化 (CR normalize 込み) + memory-curator.md `{case_id}.md` 厳命化で workaround 全撤去
+
+部分解決 (Anthropic fix 待ち):
+- Write allow glob `Write(//abs/**)` / `Write(~/...)` が subagent 継承時に path normalization 不整合で auto-deny される → bare `Write` allow + 規律ガード採用 (memory: `feedback_subagent_write_glob_inheritance.md`)
+- 個人利用システムなので「完遂率 > 物理ガード完璧追求」で公式採用 (memory: `feedback_solo_use_pragmatism.md`)
 
 ---
 

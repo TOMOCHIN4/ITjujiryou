@@ -101,6 +101,169 @@ def test_build_omage_context_contains_three_candidates(hook_module):
     assert 'to="yuko"' in ctx
 
 
+def test_extract_message_type_strips_request_suffix(hook_module):
+    """`type: xxx_request` 行から `_request` を除いた値を返す。"""
+    prompt = (
+        "新着メッセージ (msg_id=abc):\n"
+        "  from: yuko\n"
+        "  type: memory_approval_request\n"
+        "  task_id: case-1\n"
+        "---\n"
+        "本文\n"
+        "---\n"
+    )
+    assert hook_module._extract_message_type(prompt) == "memory_approval"
+
+    prompt2 = (
+        "新着メッセージ (msg_id=xyz):\n"
+        "  from: yuko\n"
+        "  type: approval_request\n"
+        "  task_id: case-2\n"
+        "---\n"
+        "本文\n"
+        "---\n"
+    )
+    assert hook_module._extract_message_type(prompt2) == "approval"
+
+
+def test_extract_message_type_fallback_when_no_type_line(hook_module):
+    """type 行が無い prompt は `approval` フォールバック。"""
+    assert hook_module._extract_message_type("ユウコより上申: 評価頼む") == "approval"
+    assert hook_module._extract_message_type("") == "approval"
+    assert hook_module._extract_message_type("from: yuko\n本文だけ\n") == "approval"
+
+
+def test_extract_message_type_handles_carriage_return(hook_module):
+    """watcher が tmux 経由で投入する prompt は `\\r` 改行で届く (verify-003 v5 で発覚)。
+    `\\r` 単独・`\\r\\n` 両方を normalize して type 行を抽出できること。"""
+    cr_prompt = (
+        "新着メッセージ (msg_id=abc):\r"
+        "  from: yuko\r"
+        "  type: memory_approval_request\r"
+        "  task_id: case-1\r"
+        "---\r"
+        "本文\r"
+        "---\r"
+    )
+    assert hook_module._extract_message_type(cr_prompt) == "memory_approval"
+
+    crlf_prompt = (
+        "新着メッセージ (msg_id=xyz):\r\n"
+        "  from: yuko\r\n"
+        "  type: approval_request\r\n"
+        "  task_id: case-2\r\n"
+        "---\r\n"
+        "本文\r\n"
+        "---\r\n"
+    )
+    assert hook_module._extract_message_type(crlf_prompt) == "approval"
+
+
+def test_build_omage_context_uses_reply_type_in_send_message(hook_module):
+    """reply_type 引数が omage 指示テンプレの send_message message_type に埋め込まれる。"""
+    picks = [
+        {"no": 13, "theme": "拳の哲学・制圧前進", "quote": "わが拳にあるのはただ制圧前進のみ！！",
+         "meta": {"変奏ヒント": "前進あるのみ", "感情の核": "迷いなし",
+                  "事務所での出番": "部下への喝", "原作文脈": "..."}},
+        {"no": 24, "theme": "食通の癇癪・評価", "quote": "今日のは口に合わぬ",
+         "meta": {"変奏ヒント": "投げ捨てる", "感情の核": "端的な拒絶",
+                  "事務所での出番": "差し戻し", "原作文脈": "..."}},
+        {"no": 22, "theme": "余裕の演技・強がり", "quote": "ひと～つ、ふた～つ、みぃ～つ!!",
+         "meta": {"変奏ヒント": "数を数える", "感情の核": "強がり",
+                  "事務所での出番": "脅し返し", "原作文脈": "..."}},
+    ]
+    ctx_memory = hook_module._build_omage_context(
+        "テスト報告本文", picks, reply_type="memory_approval"
+    )
+    assert 'message_type="memory_approval"' in ctx_memory
+    assert 'message_type="approval"' not in ctx_memory  # 上書きされる
+
+    # デフォルト引数の挙動: reply_type 省略時は "approval"
+    ctx_default = hook_module._build_omage_context("テスト報告本文", picks)
+    assert 'message_type="approval"' in ctx_default
+
+
+def test_hook_e2e_memory_approval_type(tmp_path, monkeypatch):
+    """subprocess で hook を起動、prompt の type: memory_approval_request を見て
+    出力 additionalContext に `message_type="memory_approval"` が含まれることを確認。"""
+    event = {
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": (
+            "新着メッセージ (msg_id=abc):\n"
+            "  from: yuko\n"
+            "  type: memory_approval_request\n"
+            "  task_id: case-1\n"
+            "---\n"
+            "サザン社長、儀礼承認のお伺いです。\n"
+            "---\n"
+        ),
+    }
+    result = subprocess.run(
+        [sys.executable, str(HOOK_PATH)],
+        input=json.dumps(event),
+        text=True,
+        capture_output=True,
+        timeout=10,
+    )
+    assert result.returncode == 0, f"hook exited non-zero: stderr={result.stderr}"
+    ctx = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+    assert 'message_type="memory_approval"' in ctx, (
+        "Omage 指示が memory_approval_request 受領時に memory_approval を返すよう"
+        "指示していない (workaround 残存)"
+    )
+
+
+def test_is_backstage_helper(hook_module):
+    """裏側 sentinel 判定の単純ヘルパ。"""
+    assert hook_module._is_backstage("[BACKSTAGE:curator]\nfoo") is True
+    assert hook_module._is_backstage("  [BACKSTAGE:curator] body") is True
+    assert hook_module._is_backstage("普通の上申") is False
+    assert hook_module._is_backstage("[BACKSTAGE:other] body") is False
+
+
+def test_build_silent_context_contents(hook_module):
+    """裏側 silent context が必要な指示語を含むこと。"""
+    ctx = hook_module._build_silent_context(
+        "[BACKSTAGE:curator]\ncurator_request body for integrate_proposal"
+    )
+    assert "裏側" in ctx
+    assert "memory-curator" in ctx
+    assert "curator_response" in ctx
+    assert "聖帝口調は不要" in ctx
+    # Omage Gate 用の見出しは含まれない (skip の証拠)
+    assert "## 報告受信" not in ctx
+    assert "今回の召喚で念頭に置く三選" not in ctx
+    # 本文が context に取り込まれる (sentinel は除去済)
+    assert "integrate_proposal" in ctx
+    assert "[BACKSTAGE:curator]" not in ctx  # sentinel 自体は除去
+
+
+def test_hook_skips_omage_for_backstage_sentinel(tmp_path, monkeypatch):
+    """subprocess で hook を起動し、[BACKSTAGE:curator] 先頭 prompt で
+    Omage Gate が skip されて silent context のみ注入されることを確認。"""
+    event = {
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "[BACKSTAGE:curator]\nユウコより curator_request: operation=integrate_proposal",
+    }
+    result = subprocess.run(
+        [sys.executable, str(HOOK_PATH)],
+        input=json.dumps(event),
+        text=True,
+        capture_output=True,
+        timeout=10,
+    )
+    assert result.returncode == 0, f"hook exited non-zero: stderr={result.stderr}"
+    parsed = json.loads(result.stdout)
+    ctx = parsed["hookSpecificOutput"]["additionalContext"]
+    # Omage Gate の見出しが含まれない (skip 確認)
+    assert "## 報告受信" not in ctx
+    assert "今回の召喚で念頭に置く三選" not in ctx
+    # silent モード用の指示が含まれる
+    assert "裏側" in ctx
+    assert "memory-curator" in ctx
+    assert "curator_response" in ctx
+
+
 def test_hook_end_to_end_outputs_valid_json(tmp_path, monkeypatch):
     """hook を subprocess で実行して、JSON 出力が Claude Code 仕様に合うか検証。
 

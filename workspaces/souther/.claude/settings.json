@@ -5,12 +5,12 @@
       "mcp__itjujiryou__send_message",
       "mcp__itjujiryou__read_status",
       "Task",
-      "Read"
+      "Read",
+      "Write"
     ],
     "deny": [
       "Bash",
       "Edit",
-      "Write",
       "MultiEdit",
       "NotebookEdit",
       "WebSearch",
@@ -23,13 +23,22 @@
       "mcp__itjujiryou__consult_peer",
       "mcp__itjujiryou__consult_souther",
       "mcp__itjujiryou__update_status",
-      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/writer/**)",
-      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/designer/**)",
-      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/engineer/**)",
-      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/yuko/**)"
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/writer/past_articles/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/writer/sources/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/writer/style_notes/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/designer/past_works/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/designer/style_notes/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/designer/techniques/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/engineer/bugs/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/engineer/patterns/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/engineer/preferences/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/yuko/client_handling/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/yuko/persona_translation/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/yuko/routing_decisions/**)"
     ]
   },
   "model": "claude-opus-4-7",
+  "effortLevel": "xhigh",
   "hooks": {
     "UserPromptSubmit": [
       {

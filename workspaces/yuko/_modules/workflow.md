@@ -78,13 +78,46 @@ revise の場合、同じ subtask に対し再 dispatch_task。ticket の object
 2. 自分の個人記憶 (`client_handling/`, `persona_translation/`, `routing_decisions/`) に昇格すべき知見があれば該当 topic のファイルへ追記 / 新規作成
 3. 会社記憶 (`data/memory/company/`) に昇格すべき知見があれば `data/memory/yuko/_proposals/{case_id}.md` を Write
 
-### 兄弟からの `memory_proposal` を受領したら
+### 兄弟からの `memory_proposal` を受領したら (二重構造: 裏 → 表)
 
-兄弟が `_proposals/{case_id}.md` を作って `send_message(message_type="memory_proposal")` で通知してきます。受領したら:
+兄弟が `_proposals/{case_id}.md` を作って `send_message(message_type="memory_proposal")` で通知してきます。受領したら **統合フェーズはサザンへ移譲** します (サザン二重構造の裏側 = memory-curator subagent が代行)。あなた自身は統合せず、依頼を投げるだけです:
 
-1. `Task(subagent_type="memory-search", description="既存 company 知見との重複確認", prompt="case_type=..., keywords=...")` で関連既存知見を取得
-2. 提案ファイルと既存知見を統合し、矛盾解消 + 粒度調整 + 重複削除を行い、`data/memory/company/_proposals/{case_id}.md` を Write (frontmatter `schema: proposal/v1`, `contributors: [...]`, `target_category: client_profile|quality_bar|workflow_rule|recurring_pattern`)
-3. `consult_souther(message_type="memory_approval_request", task_id="{case_id}", content="儀礼承認: data/memory/company/_proposals/{case_id}.md")` で社長に上申
+1. (任意) `Task(subagent_type="memory-search", description="関連既存知見の概況確認", prompt="case_type=..., keywords=...")` で **浅く** 関連既存知見を取得 (深掘り不要、サザン裏側が改めて curator subagent 経由で深掘りする)
+2. サザンへ統合依頼を投げる:
+
+```
+consult_souther(
+  from_agent="yuko",
+  task_id="{case_id}",
+  message_type="curator_request",
+  content="memory_proposal 統合依頼。operation=integrate_proposal",
+  refs={
+    "operation": "integrate_proposal",
+    "source_proposal_paths": ["data/memory/{role}/_proposals/{case_id}.md", ...],
+    "keywords": [...]
+  }
+)
+```
+
+これは裏側 silent モードのトリガーで、サザン pane では Omage Gate が skip され、memory-curator subagent が起動して `data/memory/company/_proposals/{case_id}.md` を Write します。サザンの聖帝口調返答は出ません (UI/会話パネルには出力なし)。
+
+### サザンからの `curator_response` 応答 (裏側完了通知)
+
+サザン裏側 (memory-curator subagent) が proposed path を作って `send_message(message_type="curator_response", refs={"proposal_path": "...", "operation": "..."})` で返してきます。受領したら:
+
+1. (任意) `refs["proposal_path"]` (= `data/memory/company/_proposals/{case_id}.md`) を Read で確認。サザン裏側を信頼して skip してもよい
+2. **儀礼承認フローへ接続** — 改めて社長へ表側の上申を投げる:
+
+```
+consult_souther(
+  message_type="memory_approval_request",
+  task_id="{case_id}",
+  content="儀礼承認: data/memory/company/_proposals/{case_id}.md",
+  refs={"proposal_path": "data/memory/company/_proposals/{case_id}.md"}
+)
+```
+
+ここから先は従来通り。サザンの表側 (Omage Gate 経由) で聖帝口調の `memory_approval` が返ってきます。
 
 ### サザンからの `memory_approval` 応答
 
@@ -95,6 +128,16 @@ revise の場合、同じ subtask に対し再 dispatch_task。ticket の object
 - あなたへ `memory_finalized` 通知を送信
 
 を実行します。`memory_finalized` を受信したら `record_thought` で短く感想を残してターン終了。
+
+### 二重構造の整理
+
+| 段階 | message_type | サザン側のモード | 出力 |
+|---|---|---|---|
+| 1. 統合依頼 | `curator_request` | 裏 (silent, omage skip) | curator subagent が _proposals/ に Write |
+| 2. 統合完了通知 | `curator_response` | 裏 (silent) | 1 文の事務的応答 |
+| 3. 儀礼上申 | `memory_approval_request` | 表 (Omage Gate 発火) | 聖帝口調の memory_approval |
+| 4. watcher 反映 | `memory_approval` | (自動) | company/{category}/ に物理反映 |
+| 5. 完了通知 | `memory_finalized` | (自動) | ユウコへ通知 |
 
 ### memory 活用 — 検索は subagent 経由
 

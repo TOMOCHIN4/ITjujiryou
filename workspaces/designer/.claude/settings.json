@@ -45,11 +45,18 @@
       "Bash(git rebase:*)",
       "Bash(curl:*)",
       "Bash(wget:*)",
-      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/writer/**)",
-      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/engineer/**)",
-      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/yuko/**)",
-      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/souther/**)"
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/writer/past_articles/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/writer/sources/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/writer/style_notes/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/engineer/bugs/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/engineer/patterns/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/engineer/preferences/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/yuko/client_handling/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/yuko/persona_translation/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/yuko/routing_decisions/**)",
+      "Read(//Users/tomohiro/Desktop/ClaudeCode/ITjujiryou/data/memory/souther/doctrines/**)"
     ]
   },
-  "model": "claude-opus-4-7"
+  "model": "claude-opus-4-7",
+  "effortLevel": "xhigh"
 }
