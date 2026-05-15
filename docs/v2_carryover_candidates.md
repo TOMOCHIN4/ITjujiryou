@@ -102,16 +102,34 @@ benchmarks/
 
 **取り入れ可否**: ✅ `docs/case_log_analysis/` の対比表 (5/14 dontAsk vs 5/15 auto) と相性が良い。「改修 X を入れたら Run N+1 で品質が Y % 上がった」を測れるようになる。**ただし Run 実行に時間 + Max OAuth 課金がかかるので、本気でやるなら別セッション計画が必要**。
 
-### 2.7 ユウコ 3 分割の "発想" を別方法で活かす
+### 2.7 ユウコ 3 パイプ別セッション分割
 
-v2 D1 はそのままだと claude -p 必須 = 監視ゼロ問題が再発する。**ただし狙い (= ユウコ context 膨張の構造的抑制) は ANALYSIS で観察された問題 (Read 12 / 14k tokens) と直結する**。
+v2 D1 の "3 分割" の本質は **subagent 3 体ではなく、ユウコ自身のセッションを「対話相手 (パイプ) 」単位で区切る** こと。ユウコには明確に 3 種類の対話パイプがある:
 
-代替案候補 (どれも tmux 1 pane 維持):
-- **(a) /clear + フェーズ別プロンプトテンプレ**: ユウコ pane で「受注 → /clear → 統合 → /clear → 振り分け」と段階別にコンテキストをクリア。各フェーズ前にテンプレ MD を読み込む。Claude Code バージョン依存のリスクは memory に既知 (`project_v2_phase_progress.md` 教訓 1)
-- **(b) subagent 経由の段階処理**: 受注時に `yuko-intake` subagent、統合時に `yuko-integrate` subagent、振り分けは本体 pane (本体で実行) という設計。subagent 内で完結する処理は context を本体に持ち込まない
-- **(c) 現状 (1 セッション貫通) + dispatch_payload 圧縮 + brevity 原則の徹底だけ**: 2026-05-15 改修で既に達成 (90% 削減)
+| パイプ | 相手 | 主な動作 | 持ち込む context |
+|---|---|---|---|
+| **P1 対クライアント** | 顧客 (UI 側 visitor) | 受注 / 要件確認 / 納品報告 | クライアントプロフィール、案件要件、納品物サマリ |
+| **P2 対社長サザン** | サザン pane | 上申 / curator_request / 承認受領 | 案件要件、整理候補メモ、決裁待ち事項 |
+| **P3 対社員三兄弟** | writer / designer / engineer pane | dispatch_task / report 受領 / 統合 | WF 名、各兄弟の役割と納品 spec、進捗状態 |
 
-**取り入れ可否**: ⚠️ (a) は v2 で却下された方式、(b) は新設計、(c) は完了済。**(b) を新たに検討する価値あり** (subagent ベースなら claude -p 監視ゼロ問題を回避できる)。
+**狙い**: パイプが切り替わるタイミングで context を整理することで、ユウコ pane 全体の肥大化 (ANALYSIS で観測: Read 12 / 14k tokens / 1 ターン) を構造的に抑制する。同じセッションに 3 パイプ分の文脈を混在させないことで、各パイプでの判断精度も上がる。
+
+**設計上の核心 = パイプ切替時の引き継ぎ装置**:
+
+context を捨てても次のパイプで困らないよう、**パイプ間で受け渡す最小情報** をファイル化する。例:
+
+- P1 → P3 切替時: `data/yuko_handoff/{case_id}/to_brothers.md` (案件 ID / 要件サマリ / WF 名 / 各兄弟への objective)
+- P3 → P2 切替時: `data/yuko_handoff/{case_id}/to_souther.md` (兄弟成果サマリ / 整理候補メモ / 上申事項)
+- P2 → P1 切替時: `data/yuko_handoff/{case_id}/to_client.md` (納品物パス / 申し送り事項)
+
+ハンドオフファイル自体は既存の `data/memory/yuko/_scratch/{case_id}/` や `data/memory/company/_proposals/{case_id}.md` と統合する余地がある (重複を作らないこと)。
+
+**セッション区切りの実装手段** (どれを採るかは別途検討、ここでは選択肢のみ):
+- **(α) /clear + パイプ別ロードテンプレ**: 同一 pane で `/clear` → 次パイプの初期プロンプト + 該当ハンドオフファイル読込。最小コスト、Claude Code バージョン依存リスクは既知 (`project_v2_phase_progress.md` 教訓 1)
+- **(β) tmux pane 分離 (P1/P2/P3 で別 pane)**: 同時並行性は最高だが、OAuth セッション数 / 監視負荷が増える。yuko 1 pane の前提 (現行設計) を覆す
+- **(γ) ハンドオフファイル経由の擬似分割 (現行の延長)**: pane も /clear もせず、各パイプ突入時に「これからは P3 モード」と明示しつつハンドオフファイルを再読込。context は完全には切れないが、ユウコ自身が「今どのパイプか」を意識する規律ガード
+
+**取り入れ可否**: ⚠️ 現段階では設計のみ。実装着手前に、(α) (β) (γ) どれを採るか / ハンドオフファイル schema / 既存 `_scratch` `_proposals` との重複整理 を決める必要あり。v2 D1 が破棄されたのは claude -p 都度起動方式が原因なので、**セッション分割の発想自体は生かしてよい** (claude -p を使わずに実現する手段が上記 (α)〜(γ))。
 
 ### 2.8 D2: 兄弟レビュー/実行分離 (発想だけ)
 
@@ -140,7 +158,7 @@ v2 D1 はそのままだと claude -p 必須 = 監視ゼロ問題が再発する
 
 ### 中期 (2-3 セッション)
 4. **D4 + D5 ワークフロー倉庫 3 階層** — ディレクトリ作成 + yuko workflow.md + 各兄弟 CLAUDE.md の蒸留昇格規律。既存 `workflows/originals/recruit-campaign-master.md` を起点に手書き 5 本配置 (case-by-case で増やす)。
-5. **2.7 (b) ユウコ subagent ベース 3 分割** — `yuko-intake` / `yuko-integrate` subagent を新設。本体 pane の context を膨らませずに段階処理を実現。
+5. **2.7 ユウコ 3 パイプ別セッション分割** — ハンドオフファイル schema を先に決め、(α) /clear + パイプ別ロードテンプレ / (β) pane 分離 / (γ) 規律ガードのみ のいずれかで実装。subagent 化ではなくユウコ自身のセッションを区切る方向。
 
 ### 長期 (週単位)
 6. **2.6 ベンチマーク基盤** — fixture + rubric + Run 計画。改修の効果測定を定量化。
