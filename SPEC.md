@@ -242,6 +242,8 @@ tests/
 
 **本番運用は auto モード (2026-05-14 後半切替済)**: `scripts/start_office.sh:43` の `PERMISSION_MODE="${ITJ_PERMISSION_MODE:-auto}"` により本番は `--permission-mode auto` で起動する。auto モードは classifier が危険操作 (rm -rf 等) を背景判定して block、通常操作は通す。dontAsk の `Tool(//abs/**)` path glob 実装不整合 (subagent 継承時のみならず本体 pane でも発覚、designer の `Bash(//.../scripts/gen-asset/**)` で auto-deny された事例あり) を回避する。`permissions.deny` は引き続き hint として機能、`permissions.allow` の path glob は信頼性が低いため `Tool(prefix:*)` 形式を推奨。memory: `feedback_auto_mode_adoption.md`、`feedback_subagent_write_glob_inheritance.md`。
 
+**dontAsk 復帰条件**: (a) auto classifier の不安定が発覚した場合、(b) Anthropic から subagent 継承の path glob fix が出た場合 — のみ。それ以外は auto モード固定。5/14 dontAsk → 5/15 auto の対比実観察は `docs/case_log_analysis/2026-05-14_15.md` に記録 (5/14: deny 4 件 / E2E 中断、5/15: deny 0 件 / 2 案件完遂)。
+
 **発言制御 (Omage Gate)**: サザンの返答は `scripts/hooks/inject_souther_mode.py` の UserPromptSubmit hook が Python ガードレールで制御する。報告受信 → 27 quote (`workspaces/souther/_modules/quotes.md`) から cooldown 付きで 3 つ抽選 → Claude が 3 オマージュを内部構築 → 最もサウザーらしい 1 案を `send_message(to="yuko", message_type="approval")` で送信、という流れ。プロンプト中心制御では発言ブレが抑えられないため、Python ロジック側で語彙集合を絞る方式に移行 (2026-05-13 設計)。サザンは `check_souther_recipient.py` PreToolUse hook で **yuko 宛以外への送信を物理 deny** されている。
 
 **二重構造 (2026-05-14 追加)**: サザンの応答経路は **表 (Front Stage)** と **裏 (Backstage)** の二段階に分かれる。
