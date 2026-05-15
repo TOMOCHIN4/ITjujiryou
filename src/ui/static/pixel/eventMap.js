@@ -42,11 +42,20 @@ function isStaffAgent(id) {
   return id && id !== "client" && id !== "system";
 }
 
+// 裏側 silent モード (persona_narrative.md §6.6) のメッセージタイプ。
+// pixel UI には一切描画しない (痕跡を残さない)。
+const BACKSTAGE_MESSAGE_TYPES = new Set(["curator_request", "curator_response"]);
+
 export const EVENT_HANDLERS = {
   message: (ev, scene, movement) => {
     const text = preview(ev.details?.message || ev.details?.preview || "💬");
     const to = ev.details?.to_agent;
     const messageType = ev.details?.message_type || "";
+
+    // 裏側 silent モードは UI 描画 skip (二重構造の裏は表側 omage 発火まで隠す)
+    if (BACKSTAGE_MESSAGE_TYPES.has(messageType)) {
+      return;
+    }
 
     // 三兄弟 → ユウコ への完了報告は、必ずユウコ席まで歩いてから発信する。
     // 自席発の bubble + 受信 bubble + パネルは到着後に遅延発火させる。

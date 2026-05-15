@@ -342,6 +342,11 @@ async def _handle_dispatch_task(args: dict[str, Any]) -> list[TextContent]:
         sub_id=explicit_subtask_id,
     )
 
+    # ticket 全文を tasks.structured_ticket に保存し、dispatch payload を短縮する。
+    # 部下は payload の objective + キー一覧で動き、詳細フィールドが必要な時のみ
+    # read_status(task_id) で structured_ticket を取得する (context 食い削減)。
+    await store.update_task_structured_ticket(task_id, ticket_json)
+
     out_dir = OUTPUTS_DIR / task_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -364,16 +369,22 @@ async def _handle_dispatch_task(args: dict[str, Any]) -> list[TextContent]:
             "修正指示に従って改訂してください。\n"
         )
 
+    objective_brief = (ticket.get("objective") or "(未設定)")[:300]
+    ticket_keys = (
+        ", ".join(ticket.keys()) if isinstance(ticket, dict) and ticket else "(なし)"
+    )
+
     dispatch_payload = (
-        "営業主任ユウコより、以下の構造化チケットを受領しました。\n\n"
+        "営業主任ユウコより、新規 subtask を受領しました。\n\n"
         f"案件ID: {task_id}\n"
         f"サブタスクID: {sub_id}\n"
         f"成果物保存先: outputs/{task_id}/\n"
         f"{round_note}"
         f"{preceding_block}\n"
-        "--- チケット (JSON) ---\n"
-        f"{json.dumps(ticket, ensure_ascii=False, indent=2)}\n"
-        "----------------------\n\n"
+        f"目的: {objective_brief}\n"
+        f"詳細フィールド: {ticket_keys}\n\n"
+        f"詳細 (背景 / 制約 / 受入条件 等) が必要な場合は "
+        f'read_status(task_id="{task_id}") を呼び、返却される `structured_ticket` を確認。\n\n'
         f"memory ディレクトリ (data/memory/{assigned_to}/) を確認し、"
         f"成果物を outputs/{task_id}/ に保存してください。"
         "完了したら send_message で yuko に report を送ってください。"
@@ -648,9 +659,16 @@ async def _handle_read_status(args: dict[str, Any]) -> list[TextContent]:
             f"- title: {task['title']}\n"
             f"- status: {task['status']}\n"
             f"- assigned_to: {task['assigned_to']}\n"
-            f"- description: {task['description']}\n\n"
-            f"## subtasks ({len(subs)})\n"
+            f"- description: {task['description']}\n"
         )
+        # structured_ticket (yuko が dispatch_task で渡した ticket 全文) があれば
+        # そのまま貼る。部下が詳細フィールドを取りに来る経路。
+        if task.get("structured_ticket"):
+            report += (
+                f"\n## structured_ticket (ticket 詳細)\n"
+                f"```json\n{task['structured_ticket']}\n```\n"
+            )
+        report += f"\n## subtasks ({len(subs)})\n"
         for s in subs:
             report += f"  - [{s['status']}] {s['assigned_to']}: {s['description'][:80]}\n"
         report += f"\n## revisions ({len(revs)})\n"

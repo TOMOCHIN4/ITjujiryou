@@ -112,6 +112,18 @@ class Store:
             await db.commit()
         await self.log_event("system", "status_change", task_id, {"status": status, "notes": notes})
 
+    async def update_task_structured_ticket(
+        self, task_id: str, ticket_json: str
+    ) -> None:
+        """dispatch_task 時に ticket 全文を保存。部下は read_status で取得する。"""
+        now = _now()
+        async with self._connect() as db:
+            await db.execute(
+                "UPDATE tasks SET structured_ticket=?, updated_at=? WHERE id=?",
+                (ticket_json, now, task_id),
+            )
+            await db.commit()
+
     async def get_task(self, task_id: str) -> Optional[dict[str, Any]]:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
