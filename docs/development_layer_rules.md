@@ -34,7 +34,7 @@
    - 承認は「その操作に対して」のみ有効。次回別の不可逆操作を行うときは再確認。
 3. **天翔十字フローを守る**
    - 任意のステップ着手前に、シンプルゴール / N / 詳細像が承認されたプランが存在することを確認する。
-   - 各 Sub-Step 終了時は必ず評価 → 次プラン承認 → 次 Sub-Step 着手の順を踏む。Sub-Step 内部での「細分化したい衝動」はプラン更新であって N の延長ではない (envPlan.md §7)。
+   - 各 Sub-Step 終了時は必ず評価 → 次プラン承認 → 次 Sub-Step 着手の順を踏む。Sub-Step 内部での「細分化したい衝動」はプラン更新であって N の延長ではない (`docs/archive/envPlan.md` §7)。
 
 ---
 
@@ -67,7 +67,17 @@
 
 各踊り場で更新されたプランは **project-local** `.claude/plans/phase_{N}_plan_v{M}.md` として履歴を残す (`vM` は踊り場通過のたびに増える)。Step 0 の場合は `phase_0_plan_v1.md` (= イニシャル = `envPlan.md` のスナップショット), `phase_0_plan_v2.md` (= 0-1 完了後), `phase_0_plan_v3.md` (= 0-2 完了後) の 3 版を経て完了する。
 
-Claude Code 組み込みの plan mode が自動生成する `~/.claude/plans/{random}.md` は drafting buffer 扱いで、踊り場通過時の正本はあくまで project-local に置く (Sub-Step 0-3 で skill 側がこの動作を自動化する)。
+Claude Code 組み込みの plan mode が自動生成する `~/.claude/plans/{random}.md` は drafting buffer 扱いで、踊り場通過時の正本はあくまで project-local に置く。
+
+天翔十字フロー上の典型作業は 3 つの skill で自動化されている (Sub-Step 0-3 で整備):
+
+| skill | 用途 |
+|---|---|
+| `/init-plan` | 新規 Phase 着手時、`phase_{N}_plan_v1.md` 雛形を生成 + `phase_state.json` を新 Phase 用に atomic 更新 |
+| `/eval-step` | Sub-Step 完了時、直近 commit と完了判定を突き合わせて ✅/⚠️/❌ 評価レポートを返す (書き込みなし) |
+| `/next-plan` | 踊り場通過時、`phase_{N}_plan_v{M+1}.md` を生成 + `phase_state.json` を atomic 更新 |
+
+phase_state.json の atomic 更新は `scripts/dev_hooks/update_phase_state.py` が temp file → `os.replace()` で行う。
 
 ---
 
