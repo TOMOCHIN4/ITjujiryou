@@ -65,21 +65,29 @@
 
 ### 3.3 プラン版数管理
 
-各踊り場で更新されたプランは `.claude/plans/phase_{N}_plan_v{M}.md` として履歴を残す (`vM` は踊り場通過のたびに増える)。Step 0 の場合は `phase_0_plan_v1.md` (= イニシャル), `phase_0_plan_v2.md` (= 0-1 完了後), `phase_0_plan_v3.md` (= 0-2 完了後) の 3 版を経て完了する。
+各踊り場で更新されたプランは **project-local** `.claude/plans/phase_{N}_plan_v{M}.md` として履歴を残す (`vM` は踊り場通過のたびに増える)。Step 0 の場合は `phase_0_plan_v1.md` (= イニシャル = `envPlan.md` のスナップショット), `phase_0_plan_v2.md` (= 0-1 完了後), `phase_0_plan_v3.md` (= 0-2 完了後) の 3 版を経て完了する。
+
+Claude Code 組み込みの plan mode が自動生成する `~/.claude/plans/{random}.md` は drafting buffer 扱いで、踊り場通過時の正本はあくまで project-local に置く (Sub-Step 0-3 で skill 側がこの動作を自動化する)。
 
 ---
 
 ## 4. Phase 進行状態の参照
 
-「いま何の Phase / Sub-Step を進行中か」の真実源は:
+「いま何の Phase / Sub-Step を進行中か」の真実源は **`.claude/phase_state.json`** である。
 
-- **`.claude/phase_state.json`** (Step 0 Sub-Step 0-2 で整備予定)
-  - 想定スキーマ: `phase` / `phase_simple_goal` / `phase_total_steps` / `sub_step_current` / `sub_step_remaining` / `latest_plan_path` / `updated_at`
+スキーマ:
 
-`.claude/phase_state.json` 未整備の暫定段階では、以下を参照:
+| キー | 意味 |
+|---|---|
+| `phase` | 現在の Phase 番号 (例: `"0"`) |
+| `phase_simple_goal` | 現 Phase のシンプルゴール (不変) |
+| `phase_total_steps` | 現 Phase の N (3 / 5 / 7) |
+| `sub_step_current` | 現在の Sub-Step (例: `"0-2"`) |
+| `sub_step_remaining` | 残ステップ数 |
+| `latest_plan_path` | 最新の踊り場プラン (project-local パス) |
+| `updated_at` | 直近更新日時 (ISO 8601) |
 
-- `envPlan.md` (Step 0 のイニシャルプラン v1。完了時に `docs/archive/` へ移動予定)
-- `.claude/plans/` 配下の最新 `phase_{N}_plan_v{M}.md`
+UserPromptSubmit hook (`scripts/dev_hooks/inject_phase.py`) がこのファイルを読み、各プロンプト処理前に context 先頭へ Phase 情報を注入する。状態の更新は踊り場通過時 (= 評価後の次プラン承認時) に行う。
 
 ---
 

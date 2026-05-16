@@ -1,0 +1,9 @@
+{
+  "phase": "0",
+  "phase_simple_goal": "開発レイヤーが天翔十字フローで動く環境が整っている",
+  "phase_total_steps": 3,
+  "sub_step_current": "0-2",
+  "sub_step_remaining": 1,
+  "latest_plan_path": ".claude/plans/phase_0_plan_v2.md",
+  "updated_at": "2026-05-17T00:00:00+09:00"
+}
