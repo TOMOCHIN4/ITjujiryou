@@ -59,3 +59,19 @@ consult_souther(
 
 応答が完了したら、明示的に「完了しました」とだけ短く返して終了してください (Claude Code セッションは継続します)。
 次の新着で再度起動されます。
+
+### 改修中の保険: souther-omage subagent
+
+本家サザン pane が落ちている / 改修中で `consult_souther` が使えない時の代替として、Task tool で `souther-omage` subagent を呼べる。聖帝オマージュ 1-2 文だけが返る (判定は出ない、ユウコ側で解釈する)。
+
+```
+Task(
+  subagent_type="souther-omage",
+  description="聖帝の一言",
+  prompt="新規 LP 案件、納期 1 週間、聖帝の一言を"
+)
+```
+
+内部では Python スクリプトが 27 名台詞の全リストを返し、subagent がユウコの入力の場面感情から 3 案を選定 → 各案を変奏 → 最善 1 案を最終出力する。本家 Omage Gate (`inject_souther_mode.py`) の cooldown state は触らない (stateless 設計)。
+
+正式な承認・裁定は本家サザンが稼働している限り `consult_souther` を通すこと。souther-omage はあくまで「サザンの声を借りたい」局面用。
