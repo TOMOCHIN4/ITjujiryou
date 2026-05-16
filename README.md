@@ -80,19 +80,9 @@ curl -X POST http://localhost:8000/api/orders \
 
 CLI (`python -m src.main cli`) でも投入できる。いずれも `data/office.db` の messages に投入するだけで、実際の処理は tmux pane の Claude Code が担う。応答は WS 経由でダッシュボードに反映される。
 
-## レート枠保護 (テスト時)
+## モデル固定 (Opus 4.7 only)
 
-5 人並列で Opus 4.7 を回すと Max 枠の消費が早い。接続検証や開発時は Sonnet / Haiku に切り替えて節約する。
-
-```bash
-./scripts/use_haiku.sh                       # 全員 Haiku 4.5 へ
-./scripts/use_haiku.sh claude-sonnet-4-6     # 全員 Sonnet 4.6 へ (引数で別モデル指定可)
-./scripts/use_opus.sh                        # 本番 Opus 4.7 へ戻す
-```
-
-各 workspace に `.claude/settings.local.json` を作って `model` だけを上書きする仕組み。`settings.local.json` は `.gitignore` 済みなので残骸が commit に紛れない。
-
-なお実測の感触として、**Sonnet 4.6 は CLAUDE.md の指示 (consult_souther を使うなど) を守る** が、**Haiku 4.5 は守らないことがある**。連携の正しさを確認するには Sonnet 以上が無難。
+全 5 pane および subagent は **`claude-opus-4-7` + `effortLevel: xhigh` (subagent は `effort: ≥medium`)** 固定で運用する。Sonnet / Haiku への降格は禁止 (`consult_souther` 等の指示追従が破綻する実害確認済)。レート枠消費を理由とした降格は行わない。詳細は `SPEC.md` §4 「設計原則」の「モデル固定」項参照。
 
 ## ペルソナ・権限ガード
 
@@ -127,7 +117,6 @@ workspaces/                 # 5 人の Claude Code ワークスペース (新)
 scripts/
   start_office.sh           # tmux 6 pane 起動
   stop_office.sh            # kill-session
-  use_haiku.sh / use_opus.sh
   inbox_watcher.py          # SQLite poll → tmux send-keys
   hooks/
     inject_souther_mode.py  # UserPromptSubmit (サザン専用)
@@ -154,7 +143,7 @@ SPEC.md §8 にも記載：
 3. ブログ LP モック (トシ + ハオウ + センシロウ複合)
 4. 値引き要求 (サザンの「ひかぬ」精神テスト)
 
-Phase A (2 pane: souther + yuko) で値引き要求案件、Phase B (5 pane / Sonnet 4.6) で挨拶文案件をスモーク済み。両方ともペルソナ漏れゼロで全往復成功 (v3.0 時点)。v3.1 世界観刷新後は再スモーク予定。
+Phase A (2 pane: souther + yuko) で値引き要求案件、Phase B (5 pane) で挨拶文案件をスモーク済み。両方ともペルソナ漏れゼロで全往復成功 (v3.0 時点)。v3.1 世界観刷新後は再スモーク予定。
 
 ## トラブルシュート
 

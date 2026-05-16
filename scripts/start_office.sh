@@ -105,8 +105,6 @@ cat <<EOM
 
   attach: tmux attach -t $SESSION
   stop  : $ROOT/scripts/stop_office.sh
-  Haiku  : $ROOT/scripts/use_haiku.sh で 5 人とも Haiku に切替
-  Opus   : $ROOT/scripts/use_opus.sh で本番 Opus に戻す
   Mode   : ITJ_PERMISSION_MODE=<mode> を環境変数で渡すと起動モードを切替 (デフォルト auto、2026-05-14 切替)
 EOM
 

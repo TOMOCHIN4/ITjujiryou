@@ -56,7 +56,7 @@
 - `src/mcp_server.py` (stdio MCP server, 9 ツール) で連携
 - `scripts/inbox_watcher.py` (SQLite poll → tmux send-keys) で起動の引き金
 - `scripts/hooks/` でペルソナ漏れガード + 召喚モード block 注入
-- Phase A (2 pane / Opus) と Phase B (5 pane / Sonnet 4.6) で実環境スモーク成功
+- Phase A (2 pane) と Phase B (5 pane) で実環境スモーク成功
 
 ### 1.4 v3.1 世界観全面刷新 (2026-05-08 後半)
 
@@ -165,7 +165,7 @@ FastAPI (:8000)  ──→  data/office.db (WAL モード)
 2. **ペルソナは事務所内に閉じる**: サザンの聖帝口調・ハオウの覇道調・トシの医療北斗調・センシロウの北斗SRE調は、クライアントに漏らさない。ユウコの「翻訳しない原則」(社内発言は引用するが前世名・固有名詞は伏せる) を守る
 3. **権限はコードで強制**: プロンプト規約に頼らず、`.claude/settings.json` の `permissions.deny` で物理的に遮断
 4. **可視化必須**: 各エージェントの動きが `data/logs/timeline.log` と Web ダッシュボードで常に見える
-5. **レート保護**: 5 人並列で Opus 4.7 を回すとサブスク枠の消費が速い。テスト・接続検証時は `./scripts/use_haiku.sh [model]` で降格
+5. **モデル固定**: 全 5 pane および subagent は **`claude-opus-4-7` + `effortLevel: xhigh` (subagent は `effort: ≥medium`)** 固定。Sonnet / Haiku への降格は禁止 (Haiku で `consult_souther` 等の指示追従が破綻する事例あり、memory: `feedback_model_opus_only.md`)。レート枠消費を理由とした降格は行わない
 6. **コード識別子は据え置き**: `workspaces/<dir>` `STAFF=[]` `from_agent`/`to_agent` の値は従来 (`souther/yuko/designer/engineer/writer`) のまま。表示名 (サザン/ユウコ/ハオウ/トシ/センシロウ) は CLAUDE.md / UI / プロダクト出力でのみ使用する
 
 ---
@@ -177,13 +177,10 @@ workspaces/                 # 5 人の Claude Code ワークスペース
   {souther,yuko,designer,engineer,writer}/
     CLAUDE.md               # 役職別ペルソナ + マルチプロセス補足
     .claude/settings.json   # permissions / hooks / model
-    .claude/settings.local.json  # (gitignore) use_haiku.sh が生成、model 上書き
     .mcp.json               # itjujiryou MCP server 参照
 scripts/
   start_office.sh           # tmux 6 pane 起動
   stop_office.sh            # kill-session
-  use_haiku.sh              # 全員モデル切替 (Haiku 4.5 / 引数で別モデル指定可)
-  use_opus.sh               # settings.local.json 削除して本番 Opus に戻す
   inbox_watcher.py          # SQLite poll → tmux send-keys (Enter ×2)
   hooks/
     inject_souther_mode.py        # 社長 UserPromptSubmit
@@ -264,17 +261,12 @@ tests/
 **原因**: Claude Code TUI は paste された複数行を multi-line input として扱う。Enter 1 回は「改行」扱いで turn 開始しない。
 **対策**: `scripts/inbox_watcher.py` の `tmux_send` で Enter を 2 回送る (1 回目で input 確定、2 回目で turn 開始)。
 
-### 7.4 Haiku の指示追従性
+### 7.4 部下が Write tool を使わずメール本文に直書き
 
-**症状**: Haiku 4.5 でユウコが CLAUDE.md の「`consult_souther` を使え」指示を無視して `send_message` で済ませる。社長応答を待たずに `dispatch_task` に進む。
-**対策**: 接続検証用にも **Sonnet 4.6 以上** を使う。Haiku でレート枠を節約したい場合は CLAUDE.md の指示を強化するか、tool description で誘導する。本番は Opus 4.7 推奨。
-
-### 7.5 部下が Write tool を使わずメール本文に直書き
-
-**症状**: ライター (Sonnet) が「outputs/{task_id}/greeting.txt を作成しました」と報告するが実ファイルは存在しない。本文だけメール内に含めて送ってくる。
+**症状**: ライターが「outputs/{task_id}/greeting.txt を作成しました」と報告するが実ファイルは存在しない。本文だけメール内に含めて送ってくる。
 **対策**: 各部下の `workspaces/{role}/CLAUDE.md` で「**`outputs/{task_id}/` に必ず Write tool で保存してから完了報告せよ**」を強調する。Phase C で文言調整予定。
 
-### 7.6 旧 Agent SDK 構成への退行リスク
+### 7.5 旧 Agent SDK 構成への退行リスク
 
 `claude-agent-sdk` を再 install したり、`src/agents/` `src/tools/registry.py` `src/orchestrator.py` `src/reception.py` を復活させてはならない。これらは v1.0 の名残で、Anthropic ポリシー違反を再導入することになる。`grep -rn 'claude_agent_sdk' src/ tests/ scripts/` で残骸が見つかったら **即削除**。
 
@@ -290,7 +282,7 @@ tests/
 ```
 
 - **Phase A (2 pane / Opus 4.7)**: シナリオ4 で全往復成功、ペルソナ漏れゼロ、召喚モード「説き諭し」hook 発火確認 (commit `f5f5545`)
-- **Phase B (5 pane / Sonnet 4.6)**: シナリオ1 (200字挨拶文) で全往復成功、ペルソナ漏れゼロ (commit `85a7894`)
+- **Phase B (5 pane)**: シナリオ1 (200字挨拶文) で全往復成功、ペルソナ漏れゼロ (commit `85a7894`)
 - **シナリオ2/3 はまだ未実施**: 余裕があるとき同 session で curl 投入で検証可
 
 ---
