@@ -1,8 +1,9 @@
 # 開発レイヤー規律
 
-> **位置付け**: Step 0 (= 愛帝十字陵システム本道 5 ステップに着手する前の環境整備フェーズ) で整備された「開発レイヤー本セッション」の運用規律集。`CLAUDE.md` から参照されることを前提とし、規律本文 (レイヤー定義 / 開発レイヤー作業時の規律 / 天翔十字フロー) はすべてこのファイルに置く。CLAUDE.md は薄く保つ。
+> **位置付け**: 「開発レイヤー本セッション」の運用規律集。`CLAUDE.md` から参照されることを前提とし、規律本文 (レイヤー定義 / 開発レイヤー作業時の規律 / 天翔十字フロー) はすべてこのファイルに置く。CLAUDE.md は薄く保つ。
 >
-> **作成日**: 2026-05-16 (Step 0 Sub-Step 0-1 にて新設)
+> **作成日**: 2026-05-16 (Step 0 にて新設)
+> **最終改修**: 2026-05-17 (Sub-Step 概念廃止、Phase 単一実装単位化)
 
 ---
 
@@ -33,49 +34,66 @@
    - `git push --force` / `git reset --hard` / `git branch -D` / `rm -rf` 系 / `--no-verify` / `--no-gpg-sign` は、ユーザーの明示承認なしに実行しない。
    - 承認は「その操作に対して」のみ有効。次回別の不可逆操作を行うときは再確認。
 3. **天翔十字フローを守る**
-   - 任意のステップ着手前に、シンプルゴール / N / 詳細像が承認されたプランが存在することを確認する。
-   - 各 Sub-Step 終了時は必ず評価 → 次プラン承認 → 次 Sub-Step 着手の順を踏む。Sub-Step 内部での「細分化したい衝動」はプラン更新であって N の延長ではない (`docs/archive/envPlan.md` §7)。
+   - 案件着手前に、シンプルゴール / 全 Phase 数 N / 当 Phase の完了判定が承認されたプランが存在することを確認する。
+   - 各 Phase 終了時は必ず評価 → 次 Phase 着手承認の順を踏む。
 
 ---
 
 ## 3. 天翔十字フロー
 
-開発レイヤー作業はすべて以下のフローで動かす。
+開発レイヤー作業はすべて以下のフローで動かす。**ただし天翔十字フロー本体・skill・hook・docs・settings の整備自体はこのフローを通さない (§3.4 参照)**。
 
 ### 3.1 フロー定義
 
 ```
 1. ユーザーから指示を受ける
-2. シンプルゴール設定 + 到達 N (3 / 5 / 7) を判断 + 詳細ゴールを含むイニシャルプラン作成
-3. ユーザー承認
-4. ステップ 1 実行
-5. ステップ 1 終了後、Claude Code + ユーザーで評価
-6. シンプルゴール + イニシャルプラン + 実績 + 残ステップから、セカンドプラン (1 ステップ減) 作成 → ユーザー承認
-7. ステップ 2 実行
-8. ... 同様に最終ステップまで
-9. 設定ステップ数終了時にシンプルゴール達成
+2. シンプルゴール設定 + 全 Phase 数 N (3 / 5 / 7) を判断
+3. Phase A のプランを作成 (= 当 Phase の完了判定を含む)
+4. ユーザー承認
+5. Phase A 実行
+6. Phase A 終了後、Claude Code + ユーザーで評価
+7. Phase B のプランを作成 → ユーザー承認
+8. Phase B 実行 → 評価
+9. ... 同様に Phase 最終まで
+10. 全 Phase 完了時にシンプルゴール達成
 ```
 
 ### 3.2 整理
 
 - **N は 3 / 5 / 7 から選ぶ** — 案件規模で判断し、確定後変更しない。
-- **詳細ゴールはステップごとに更新する** — 1 ステップ減るたびにプランを再作成。
-- **シンプルゴールは不変**。
-- **各ステップ終了時に評価 → 次プラン承認 → 次ステップ** の順を必ず踏む。
+- **「N を決める」 = Sub-Step を作らずに収まる粒度に分割すること**。粒度が大きすぎるなら N の取り方を見直して Phase を切り直す。
+- **各 Phase は単一の実装単位** — N=3 なら Phase A / B / C それぞれ独立した実装単位として扱う。
+- **シンプルゴールは全 Phase 通して不変**。
+- **各 Phase 終了時に評価 → 次 Phase 着手承認** の順を必ず踏む。
 
-### 3.3 プラン版数管理
+### 3.3 「Phase 以外作るな」原則
 
-各踊り場で更新されたプランは **project-local** `.claude/plans/phase_{N}_plan_v{M}.md` として履歴を残す (`vM` は踊り場通過のたびに増える)。Step 0 の場合は `phase_0_plan_v1.md` (= イニシャル = `envPlan.md` のスナップショット), `phase_0_plan_v2.md` (= 0-1 完了後), `phase_0_plan_v3.md` (= 0-2 完了後) の 3 版を経て完了する。
+天翔十字フローでは **Phase 以外の構造物を作ってはならない**。具体的禁止事項:
 
-Claude Code 組み込みの plan mode が自動生成する `~/.claude/plans/{random}.md` は drafting buffer 扱いで、踊り場通過時の正本はあくまで project-local に置く。
+- **Phase 内部を Sub-Step / サブフェーズ / マイルストーン等で分割しない**。分割したくなったら N の取り方が誤っているので Phase を切り直す。
+- **踊り場・中間プラン・中間レビュー節を作らない**。レビューは Phase 完了時の `eval-phase` 1 回のみ。
+- **v1 / v2 等のプラン版数を付けない**。1 Phase = 1 plan ファイル (`.claude/plans/phase_{ID}.md`) 固定。修正が必要なら同ファイルを直接編集し、来歴は git 履歴に任せる。
+- **「セカンドプラン」「サードプラン」「次プラン (v{M+1})」概念は廃止**。次 Phase 着手時の新規 plan が事実上の「次プラン」に相当する。
 
-天翔十字フロー上の典型作業は 3 つの skill で自動化されている (Sub-Step 0-3 で整備):
+この原則は禁止形で表現される。「Phase 単位で考えろ」ではなく「**Phase 以外作るな**」。
+
+### 3.4 フロー自体の整備はフロー外
+
+天翔十字フロー本体 (本ドキュメント / skill / hook / `.claude/settings.json` / phase_state スキーマ等) の改修は、**天翔十字フローを通さずに直接実行する**。
+
+理由:
+- フロー本体の改修中はフロー駆動状態を「中断」とする方が安全 (自己言及回避)。
+- 改修中の状態は `phase_state.json` の `phase_current: "_frozen"` で表現する (この間 hook は注入をスキップする)。
+- 改修完了後、最初の本番案件 (envPlan mainline Phase 1 など) を新しい仕様で立ち上げる。
+
+### 3.5 skill による自動化
+
+天翔十字フロー上の典型作業は 2 つの skill で自動化されている:
 
 | skill | 用途 |
 |---|---|
-| `/init-plan` | 新規 Phase 着手時、`phase_{N}_plan_v1.md` 雛形を生成 + `phase_state.json` を新 Phase 用に atomic 更新 |
-| `/eval-step` | Sub-Step 完了時、直近 commit と完了判定を突き合わせて ✅/⚠️/❌ 評価レポートを返す (書き込みなし) |
-| `/next-plan` | 踊り場通過時、`phase_{N}_plan_v{M+1}.md` を生成 + `phase_state.json` を atomic 更新 |
+| `/init-plan` | 新規 Phase 着手時、`.claude/plans/phase_{ID}.md` 雛形を生成 + `phase_state.json` を新 Phase 用に atomic 更新 |
+| `/eval-phase` | Phase 完了時、当 Phase の commit 範囲と完了判定を突き合わせて ✅/⚠️/❌ 評価レポートを返す (書き込みなし) |
 
 phase_state.json の atomic 更新は `scripts/dev_hooks/update_phase_state.py` が temp file → `os.replace()` で行う。
 
@@ -83,26 +101,26 @@ phase_state.json の atomic 更新は `scripts/dev_hooks/update_phase_state.py` 
 
 ## 4. Phase 進行状態の参照
 
-「いま何の Phase / Sub-Step を進行中か」の真実源は **`.claude/phase_state.json`** である。
+「いま何の Phase を進行中か」の真実源は **`.claude/phase_state.json`** である。
 
 スキーマ:
 
 | キー | 意味 |
 |---|---|
-| `phase` | 現在の Phase 番号 (例: `"0"`) |
-| `phase_simple_goal` | 現 Phase のシンプルゴール (不変) |
-| `phase_total_steps` | 現 Phase の N (3 / 5 / 7) |
-| `sub_step_current` | 現在の Sub-Step (例: `"0-2"`) |
-| `sub_step_remaining` | 残ステップ数 |
-| `latest_plan_path` | 最新の踊り場プラン (project-local パス) |
+| `phase_current` | 現在の Phase ID (例: `"A"` / `"1"`)。フロー外作業中は `"_frozen"` |
+| `phase_simple_goal` | フロー全体のシンプルゴール (不変) |
+| `phase_total` | 全 Phase 数 N (3 / 5 / 7)。凍結中は `0` |
+| `phase_remaining` | 残 Phase 数。凍結中は `0` |
+| `latest_plan_path` | 最新の Phase プラン (project-local パス、`.claude/plans/phase_{ID}.md`) |
 | `updated_at` | 直近更新日時 (ISO 8601) |
 
-UserPromptSubmit hook (`scripts/dev_hooks/inject_phase.py`) がこのファイルを読み、各プロンプト処理前に context 先頭へ Phase 情報を注入する。状態の更新は踊り場通過時 (= 評価後の次プラン承認時) に行う。
+UserPromptSubmit hook (`scripts/dev_hooks/inject_phase.py`) がこのファイルを読み、各プロンプト処理前に context 先頭へ Phase 情報を注入する。状態の更新は Phase 着手時 (`/init-plan`) に行う。`phase_current` が `"_frozen"` のときは hook は注入をスキップする。
 
 ---
 
 ## 5. このファイルの位置
 
-- `CLAUDE.md` は薄く保ち、本ファイル (`docs/development_layer_rules.md`) を参照する形にする (envPlan §8 確定事項)。
+- `CLAUDE.md` は薄く保ち、本ファイル (`docs/development_layer_rules.md`) を参照する形にする。
 - 規律の更新は本ファイルを直接編集する。CLAUDE.md は参照リンクのみ。
-- Step 0 完了後も本ファイルは残る (Phase 1 以降の作業基盤として継続利用)。
+- 本ファイルは Phase 1 以降の作業基盤として継続利用される。
+- 本ファイル自身の更新も §3.4 に従い天翔十字フロー外で実施する。

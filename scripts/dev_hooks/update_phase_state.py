@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """`.claude/phase_state.json` を atomic に更新する helper。
 
-天翔十字フローの skill (`/init-plan` / `/next-plan`) から呼び出される。
+天翔十字フローの skill (`/init-plan`) から呼び出される。
 任意の key=value を CLI 引数で渡し、`updated_at` は自動で JST 現在時刻に置換する。
 
 使用例:
   python3 scripts/dev_hooks/update_phase_state.py \
-    sub_step_current=0-3 \
-    sub_step_remaining=0 \
-    latest_plan_path=.claude/plans/phase_0_plan_v3.md
+    phase_current=B \
+    phase_remaining=1 \
+    latest_plan_path=.claude/plans/phase_B.md
 
 挙動:
   1. 現 phase_state.json を読み込み JSON として parse
-  2. 引数で渡された key=value を適用 (int 化は phase_total_steps / sub_step_remaining のみ)
+  2. 引数で渡された key=value を適用 (int 化は phase_total / phase_remaining のみ)
   3. updated_at を JST ISO 8601 (秒精度) で置換
   4. temp file に書き → os.replace() で atomic rename
   5. 失敗時は stderr に短文 + exit 1
@@ -28,13 +28,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 JST = timezone(timedelta(hours=9))
-INT_KEYS = {"phase_total_steps", "sub_step_remaining"}
+INT_KEYS = {"phase_total", "phase_remaining"}
 REQUIRED_KEYS = {
-    "phase",
+    "phase_current",
     "phase_simple_goal",
-    "phase_total_steps",
-    "sub_step_current",
-    "sub_step_remaining",
+    "phase_total",
+    "phase_remaining",
     "latest_plan_path",
     "updated_at",
 }

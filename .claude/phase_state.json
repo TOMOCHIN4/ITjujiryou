@@ -1,9 +1,8 @@
 {
-  "phase": "A",
-  "phase_simple_goal": "天翔十字フローの 3 skill (init-plan / eval-step / next-plan) が、通常依頼で誤発動せず、明示呼び出し時のみ仕様通り機能することが、実機検証と設計レビュー両面で確認されている",
-  "phase_total_steps": 3,
-  "sub_step_current": "A-1",
-  "sub_step_remaining": 2,
-  "latest_plan_path": ".claude/plans/phase_A_plan_v1.md",
-  "updated_at": "2026-05-17T06:37:00+09:00"
+  "phase_current": "_frozen",
+  "phase_simple_goal": "(凍結中: 天翔十字フロー本体の改修中、フロー外で作業)",
+  "phase_total": 0,
+  "phase_remaining": 0,
+  "latest_plan_path": "",
+  "updated_at": "2026-05-17T07:30:00+09:00"
 }
