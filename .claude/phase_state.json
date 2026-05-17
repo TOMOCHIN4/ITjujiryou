@@ -1,8 +1,8 @@
 {
-  "phase_current": "_frozen",
-  "phase_simple_goal": "(凍結中: 天翔十字フロー本体の改修中、フロー外で作業)",
-  "phase_total": 0,
+  "phase_current": "C",
+  "phase_simple_goal": "prompts/ 配下の全ファイルの索引 + 1 行要約を docs/prompts_overview.md として整備し commit 済みにする",
+  "phase_total": 3,
   "phase_remaining": 0,
-  "latest_plan_path": "",
-  "updated_at": "2026-05-17T07:30:00+09:00"
+  "latest_plan_path": ".claude/plans/phase_C.md",
+  "updated_at": "2026-05-17T10:24:56+09:00"
 }
