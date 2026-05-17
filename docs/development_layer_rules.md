@@ -86,16 +86,23 @@
 - 改修中の状態は `phase_state.json` の `phase_current: "_frozen"` で表現する (この間 hook は注入をスキップする)。
 - 改修完了後、最初の本番案件 (envPlan mainline Phase 1 など) を新しい仕様で立ち上げる。
 
+フロー外作業への切替は `python3 scripts/dev_hooks/freeze_phase_state.py --freeze` で凍結、復帰は `--unfreeze-to-init` で空白化してから初回 `/init-plan` を呼ぶ。`phase_state.json` を手で編集せず、必ず helper を経由すること。
+
 ### 3.5 skill による自動化
 
-天翔十字フロー上の典型作業は 2 つの skill で自動化されている:
+天翔十字フロー上の典型作業は 3 つの skill で自動化されている:
 
 | skill | 用途 |
 |---|---|
-| `/init-plan` | 新規 Phase 着手時、`.claude/plans/phase_{ID}.md` 雛形を生成 + `phase_state.json` を新 Phase 用に atomic 更新 |
+| `/init-plan` | **初回 Phase 着手時のみ**。`.claude/plans/phase_{ID}.md` 雛形を生成 + `phase_state.json` を初回 Phase 用に atomic 初期化 (シンプルゴール / N の確定はこの skill 限定) |
+| `/next-plan` | **2 回目以降の Phase 着手時**。`.claude/plans/phase_{ID}.md` 雛形を生成 + `phase_state.json` を次 Phase 用に atomic 遷移 (シンプルゴール / N は継承して書き換えない) |
 | `/eval-phase` | Phase 完了時、当 Phase の commit 範囲と完了判定を突き合わせて ✅/⚠️/❌ 評価レポートを返す (書き込みなし) |
 
-phase_state.json の atomic 更新は `scripts/dev_hooks/update_phase_state.py` が temp file → `os.replace()` で行う。
+phase_state.json の atomic 更新は責務ごとに分かれた 3 helper が temp file → `os.replace()` で行う:
+
+- `scripts/dev_hooks/init_phase_state.py` — 初回 Phase 専用。既存 `phase_current` が `_frozen` 以外なら exit 1
+- `scripts/dev_hooks/advance_phase_state.py` — 2 回目以降専用。受理キーは `phase_current` / `phase_remaining` / `latest_plan_path` のみ。`phase_simple_goal` / `phase_total` を渡すと exit 1 (= シンプルゴール / N の物理ガード)
+- `scripts/dev_hooks/freeze_phase_state.py` — フロー外作業用。`--freeze` / `--unfreeze-to-init`
 
 ---
 

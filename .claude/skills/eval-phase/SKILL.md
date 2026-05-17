@@ -73,7 +73,7 @@ git diff --stat HEAD~N HEAD   # N = Phase 内の commit 数
 
 ### 次の動き
 
-Phase {ID} 完了。次 Phase ({次の ID}) に進みますか？ 進む場合は `/init-plan` を呼んでください。
+Phase {ID} 完了。次 Phase ({次の ID}) に進みますか？ 進む場合は **初回 Phase なら `/init-plan`、2 回目以降なら `/next-plan`** を呼んでください。
 ```
 
 ## 重要

@@ -1,3 +1,5 @@
+> ※ これは Sub-Step 廃止前の旧仕様。現役は `.claude/skills/next-plan/` を参照のこと (commit 98bf428 以降、Phase 単一実装単位化済)。
+
 ---
 name: next-plan
 description: 天翔十字フローの踊り場で次プラン (v{M+1}) を生成、project-local .claude/plans/phase_{N}_plan_v{M+1}.md に書き出して phase_state.json (sub_step_current / sub_step_remaining / latest_plan_path / updated_at) を atomic 更新する。
