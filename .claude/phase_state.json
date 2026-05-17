@@ -1,8 +1,8 @@
 {
-  "phase_current": "A",
-  "phase_simple_goal": "scripts/ ディレクトリの保守性を index・分類・呼出元可視化の観点で底上げする",
-  "phase_total": 3,
-  "phase_remaining": 2,
-  "latest_plan_path": ".claude/plans/phase_A.md",
-  "updated_at": "2026-05-17T08:26:47+09:00"
+  "phase_current": "_frozen",
+  "phase_simple_goal": "(凍結中: 天翔十字フロー本体の改修中、フロー外で作業)",
+  "phase_total": 0,
+  "phase_remaining": 0,
+  "latest_plan_path": "",
+  "updated_at": "2026-05-17T07:30:00+09:00"
 }
