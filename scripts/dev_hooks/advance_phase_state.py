@@ -14,6 +14,8 @@
 拒否キー (IMMUTABLE): phase_simple_goal / phase_total
 ガード:
   - 既存 phase_current が None / "_frozen" なら exit 1 (= init から始めよ)
+  - 既存 phase_remaining == 0 (= フロー完了済) なら exit 1
+    (= freeze してから init し直せ。phase_total を暗黙に書き換える経路を塞ぐ)
   - 受理外のキーが 1 つでも渡されたら exit 1
   - 書込前に不変キー (simple_goal / total) が変わっていないことを再確認
 
@@ -126,6 +128,16 @@ def main(argv: list[str]) -> int:
             f"advance_phase_state: 既存 phase_current="
             f"{state.get('phase_current')!r} は進行中フローではありません。"
             "初回 Phase 着手は init_phase_state.py を使ってください。",
+            file=sys.stderr,
+        )
+        return 1
+
+    if state.get("phase_remaining") == 0:
+        print(
+            "advance_phase_state: 既存 phase_remaining=0 (= フロー完了済) の状態 "
+            "では遷移できません。phase_total を超える Phase の追加と等価のため拒否します。"
+            "新案件は freeze_phase_state.py --freeze でフローを凍結し、"
+            "init_phase_state.py で立ち上げ直してください。",
             file=sys.stderr,
         )
         return 1
