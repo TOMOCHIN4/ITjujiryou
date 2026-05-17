@@ -83,15 +83,20 @@
 
 フロー外作業への切替は `python3 scripts/dev_hooks/freeze_phase_state.py --freeze` で凍結、復帰は `--unfreeze-to-init` で空白化してから初回 `/init-plan` を呼ぶ。`phase_state.json` を手で編集せず、必ず helper を経由すること。
 
+`freeze_phase_state.py --freeze` の起動契機は **自動** と **手動** の 2 種類:
+
+- **自動**: 最終 Phase (`phase_remaining=0`) の `/eval-phase` 完了時、skill が評価レポート出力直後に自動実行する。シンプルゴール達成と同時にフローを凍結し、次案件への切替準備を完了させる
+- **手動**: フロー本体の改修に入る前、ユーザー意思でフロー中断する時、ユーザーが直接コマンドを叩く
+
 ### 3.5 skill による自動化
 
 天翔十字フロー上の典型作業は 3 つの skill で自動化されている:
 
-| skill | 用途 |
-|---|---|
-| `/init-plan` | **初回 Phase 着手時のみ**。`.claude/plans/phase_{ID}.md` 雛形を生成 + `phase_state.json` を初回 Phase 用に atomic 初期化 (シンプルゴール / N の確定はこの skill 限定) |
-| `/next-plan` | **2 回目以降の Phase 着手時**。`.claude/plans/phase_{ID}.md` 雛形を生成 + `phase_state.json` を次 Phase 用に atomic 遷移 (シンプルゴール / N は継承して書き換えない) |
-| `/eval-phase` | Phase 完了時、当 Phase の commit 範囲と完了判定を突き合わせて ✅/⚠️/❌ 評価レポートを返す (書き込みなし) |
+| skill | 起動 | 用途 |
+|---|---|---|
+| `/init-plan` | 手動 | **初回 Phase 着手時のみ**。`.claude/plans/phase_{ID}.md` 雛形を生成 + `phase_state.json` を初回 Phase 用に atomic 初期化 (シンプルゴール / N の確定はこの skill 限定) |
+| `/next-plan` | 手動 | **2 回目以降の Phase 着手時**。`.claude/plans/phase_{ID}.md` 雛形を生成 + `phase_state.json` を次 Phase 用に atomic 遷移 (シンプルゴール / N は継承して書き換えない) |
+| `/eval-phase` | **自動** (+ 手動互換) | Phase 完了判定を満たした直後、skill 側で**自発的に**起動して評価レポートを返す。最終 Phase (`phase_remaining=0`) では評価出力直後に `freeze_phase_state.py --freeze` を実行してフロー凍結まで自動化。明示的な `/eval-phase` 呼出 (再評価用途) も互換で残存 |
 
 phase_state.json の atomic 更新は責務ごとに分かれた 3 helper が temp file → `os.replace()` で行う:
 
